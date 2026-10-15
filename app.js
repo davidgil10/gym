@@ -19,7 +19,7 @@ async function load(){machines=(await all()).sort((a,b)=>a.created-b.created);fo
 const sgn=n=>(n>0?'+':n<0?'−':'')+fmt(Math.abs(n));
 const fromStart=m=>{const s0=m.history[0]?m.history[0].w:m.weight,d=m.weight-s0;if(!d)return'';const pc=s0?` (${sgn(d/s0*100).replace(/(\.\d)\d+/,'$1')}%)`:'';return `<span style="color:${d>0?'#4ade80':'#f87171'}"><bdi dir="ltr">${sgn(d)}</bdi> ק״ג מההתחלה <bdi dir="ltr">${pc.trim()}</bdi></span>`};
 const card=m=>`<button class="card" data-id="${m.id}">${m.photo?`<img src="${m.photo}" alt="">`:'<div class="ph">🏋️</div>'}
-  <div class="ov"><div class="w">${fmt(m.weight)} <small>ק״ג</small></div><div class="n">${esc(m.name)}</div><div class="d">${fromStart(m)}</div><div class="d">עודכן: ${fdate(m.updated)}</div></div></button>`;
+  <div class="ov"><div class="w">${m.weight?`${fmt(m.weight)} <small>ק״ג</small>`:'<small>משקל לא הוגדר</small>'}</div><div class="n">${esc(m.name)}</div><div class="d">${fromStart(m)}</div><div class="d">${m.history.length?`עודכן: ${fdate(m.updated)}`:'לחץ להגדרת משקל'}</div></div></button>`;
 function render(){
   if(filter!=='all'&&filter!==NONE&&!groups.some(g=>g.id===filter))filter='all';
   const hasNone=machines.some(m=>m.group===NONE);if(filter===NONE&&!hasNone)filter='all';
@@ -27,7 +27,7 @@ function render(){
   $('#chips').innerHTML=tabs.map(t=>{const n=t.id==='all'?machines.length:machines.filter(m=>m.group===t.id).length;return `<button class="chip${t.id===filter?' on':''}" data-g="${t.id}">${esc(t.name)} <small>${n}</small></button>`}).join('')+'<button class="chip" id="mgGroups">⚙️ קבוצות</button>';
   $('#empty').hidden=machines.length>0||view!=='machines';
   if(filter==='all'){$('#grid').innerHTML=[...groups,{id:NONE,name:'ללא קטגוריה'}].map(g=>{const ms=machines.filter(m=>m.group===g.id);return ms.length?`<h3 class="sec">${esc(g.name)}</h3>`+ms.map(card).join(''):''}).join('')}
-  else{const ms=machines.filter(m=>m.group===filter);$('#grid').innerHTML=ms.length?ms.map(card).join(''):'<p class="sec-empty">אין עדיין מכשירים בקבוצה הזו</p>'}
+  else{const ms=machines.filter(m=>m.group===filter);$('#grid').innerHTML=ms.length?ms.map(card).join(''):'<p class="sec-empty">אין עדיין תרגילים בקבוצה הזו</p>'}
 }
 $('#chips').addEventListener('click',e=>{const c=e.target.closest('.chip');if(!c)return;if(c.id==='mgGroups')return openGroups();filter=c.dataset.g;render();scrollTo(0,0)});
 $('#grid').addEventListener('click',e=>{const c=e.target.closest('.card');if(c)(session?openLog:openEdit)(c.dataset.id)});
@@ -43,13 +43,13 @@ function wirePhoto(state){$('#camBtn').onclick=()=>$('#cam').click();$('#galBtn'
   for(const id of ['#cam','#gal'])$(id).onchange=async e=>{const f=e.target.files[0];if(!f)return;state.photo=await compress(f);$('#prev').src=state.photo;$('#prev').hidden=false}}
 // add / edit details
 function openForm(m){const st={photo:m?m.photo:null};
-  openSheet(`<h2>${m?'עריכת מכשיר':'מכשיר חדש'}</h2>${photoPicker(st.photo)}
-  <label>שם המכשיר</label><input type="text" id="fName" value="${m?esc(m.name):''}" placeholder="למשל: לחיצת חזה">
+  openSheet(`<h2>${m?'עריכת תרגיל':'תרגיל חדש'}</h2>${photoPicker(st.photo)}
+  <label>שם התרגיל</label><input type="text" id="fName" value="${m?esc(m.name):''}" placeholder="למשל: לחיצת חזה">
   <label>אזור בגוף</label><select id="fG">${groups.map(g=>`<option value="${g.id}">${esc(g.name)}</option>`).join('')}<option value="${NONE}">ללא קטגוריה</option></select>
   ${m?'':'<label>משקל התחלתי (ק״ג)</label><input type="number" id="fW" inputmode="decimal" step="0.5" min="0" value="10">'}
-  <button class="btn pri" id="fSave">שמור</button>${m?'<button class="btn danger" id="fDel">🗑️ מחק מכשיר</button>':''}<button class="btn" id="fCancel">ביטול</button>`);
+  <button class="btn pri" id="fSave">שמור</button>${m?'<button class="btn danger" id="fDel">🗑️ מחק תרגיל</button>':''}<button class="btn" id="fCancel">ביטול</button>`);
   $('#fG').value=m?m.group:(filter!=='all'?filter:(groups[0]||{id:NONE}).id);wirePhoto(st);$('#fCancel').onclick=m?()=>openEdit(m.id):closeSheet;
-  $('#fSave').onclick=async()=>{const name=$('#fName').value.trim();if(!name){$('#fName').focus();return alert('צריך שם למכשיר')}
+  $('#fSave').onclick=async()=>{const name=$('#fName').value.trim();if(!name){$('#fName').focus();return alert('צריך שם לתרגיל')}
     const group=$('#fG').value;if(m){m.name=name;m.photo=st.photo;m.group=group;await put(m);await load();openEdit(m.id);return}
     const w=parseFloat($('#fW').value);if(!(w>=0))return alert('משקל לא תקין');const now=Date.now();
     await put({id:newId(),name,group,photo:st.photo,weight:w,step:2.5,created:now,updated:now,history:[{t:now,w}]});closeSheet();load()};
@@ -68,6 +68,7 @@ function openEdit(id){const m=machines.find(x=>x.id===id);if(!m)return closeShee
   <button class="btn pri" id="eSave" disabled>שמור</button><button class="btn" id="eCancel">סגור בלי לשמור</button>
   <h2 style="margin-top:20px">התקדמות</h2><div class="delta">${fromStart(m)}</div>${chart(m.history)}
   <ul class="hist">${hist.map((x,i)=>{const prev=hist[i+1];const d=prev?x.w-prev.w:0;return `<li><span>${fdate(x.t)}</span><span>${fmt(x.w)} ק״ג ${d?`<small style="color:${d>0?'#22c55e':'#f87171'}">(${d>0?'+':''}${fmt(d)})</small>`:''}</span></li>`}).join('')}</ul>`);
+  $('#eV').onclick=()=>{const x=parseFloat((prompt('הקלד משקל (ק״ג):',fmt(v))||'').replace(',','.'));if(x>=0&&x<1000){v=Math.round(x*100)/100;upd()}};
   const upd=()=>{$('#eV').innerHTML=`${fmt(v)} <small>ק״ג</small>`;const d=v-m.weight;$('#eD').textContent=d?`${d>0?'+':''}${fmt(d)} מהמשקל השמור — לחץ "שמור" כדי לעדכן`:'';$('#eSave').disabled=!d;
     document.querySelectorAll('.steps button').forEach(b=>b.classList.toggle('on',+b.dataset.s===step))};upd();
   document.querySelectorAll('.steps button').forEach(b=>b.onclick=()=>{step=+b.dataset.s;upd()});
@@ -79,8 +80,8 @@ let tt;function toast(msg,undo){$('#toastMsg').textContent=msg;$('#toast').hidde
   $('#undoBtn').onclick=async()=>{$('#toast').hidden=true;await undo()};tt=setTimeout(()=>$('#toast').hidden=true,6000)}
 // menu: backup
 $('#menuBtn').onclick=()=>{openSheet(`<h2>גיבוי</h2><p style="opacity:.8;font-size:14px">הנתונים שמורים רק בטלפון הזה. מומלץ לייצא גיבוי מדי פעם.</p>
-  <button class="btn" id="mExp">⬇️ ייצוא גיבוי (JSON)</button><button class="btn" id="mImp">⬆️ ייבוא גיבוי</button><button class="btn" id="mClose">סגור</button>`);
-  $('#mClose').onclick=closeSheet;
+  <button class="btn" id="mLib">📚 שחזר תרגילים מובנים</button><button class="btn" id="mExp">⬇️ ייצוא גיבוי (JSON)</button><button class="btn" id="mImp">⬆️ ייבוא גיבוי</button><button class="btn" id="mClose">סגור</button>`);
+  $('#mClose').onclick=closeSheet;$('#mLib').onclick=async()=>{const n=await addLibrary();closeSheet();toast(n?`נוספו ${n} תרגילים מובנים`:'כל התרגילים המובנים כבר קיימים',null)};
   $('#mExp').onclick=()=>{const b=new Blob([JSON.stringify({app:'gym-weights',v:2,exported:Date.now(),groups,machines,body,sessions},null,1)],{type:'application/json'});
     const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`gym-backup-${new Date().toISOString().slice(0,10)}.json`;a.click()};
   $('#mImp').onclick=()=>$('#importFile').click()};
@@ -88,7 +89,7 @@ $('#importFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{c
   if(Array.isArray(d.sessions))for(const x of d.sessions){if(x&&x.id&&x.start&&Array.isArray(x.sets)&&!sessions.some(y=>y.id===x.id))sessions.push(x)}
   if(Array.isArray(d.body))for(const e of d.body){if(e&&e.id&&e.date&&!body.some(x=>x.id===e.id))body.push(e)}
   if(Array.isArray(d.groups))for(const g of d.groups){if(g&&g.id&&g.name&&!groups.some(x=>x.id===g.id))groups.push({id:g.id,name:g.name})}
-  if(!confirm(`לייבא ${list.length} מכשירים? מכשירים קיימים עם אותו מזהה יוחלפו.`))return;
+  if(!confirm(`לייבא ${list.length} תרגילים? תרגילים קיימים עם אותו מזהה יוחלפו.`))return;
   for(const m of list){if(!m.id||!m.name||typeof m.weight!=='number')continue;m.history=m.history||[{t:m.updated||Date.now(),w:m.weight}];await put(m)}await saveGroups();await saveBody();await saveSessions();closeSheet();renderBody();load();alert('הייבוא הושלם')}catch{alert('קובץ גיבוי לא תקין')}e.target.value=''};
 function openGroups(){openSheet(`<h2>קבוצות שרירים</h2><ul class="hist">${groups.map(g=>`<li><span>${esc(g.name)} <small>(${machines.filter(m=>m.group===g.id).length})</small></span><span><button class="link" data-ren="${g.id}">✏️ שנה שם</button><button class="link" data-del="${g.id}" style="color:#f87171">🗑️ מחק</button></span></li>`).join('')}</ul>
   <label>קבוצה חדשה</label><div class="row"><input type="text" id="gNew" placeholder="למשל: ישבן"><button class="btn pri" id="gAdd" style="width:auto;margin:0">הוסף</button></div><button class="btn" id="gClose">סגור</button>`);
@@ -96,8 +97,16 @@ function openGroups(){openSheet(`<h2>קבוצות שרירים</h2><ul class="hi
   $('#gAdd').onclick=async()=>{const n=$('#gNew').value.trim();if(!n)return;if(groups.some(g=>g.name===n))return alert('קבוצה בשם הזה כבר קיימת');groups.push({id:newId(),name:n});await saveGroups();render();openGroups()};
   $('#sheet').querySelectorAll('[data-ren]').forEach(b=>b.onclick=async()=>{const g=groups.find(x=>x.id===b.dataset.ren);const n=(prompt('שם חדש לקבוצה:',g.name)||'').trim();if(!n||n===g.name)return;g.name=n;await saveGroups();render();openGroups()});
   $('#sheet').querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{const g=groups.find(x=>x.id===b.dataset.del);const ms=machines.filter(m=>m.group===g.id);
-    if(!confirm(`למחוק את הקבוצה "${g.name}"?`+(ms.length?` ${ms.length} מכשירים יעברו ל"ללא קטגוריה".`:'')))return;
+    if(!confirm(`למחוק את הקבוצה "${g.name}"?`+(ms.length?` ${ms.length} תרגילים יעברו ל"ללא קטגוריה".`:'')))return;
     for(const m of ms){m.group=NONE;await put(m)}groups=groups.filter(x=>x!==g);await saveGroups();await load();openGroups()})}
+// ===== built-in exercise library =====
+async function addLibrary(){const have=new Set(machines.map(m=>m.name.trim()));let n=0,now=Date.now();
+  for(const e of LIBRARY){if(have.has(e.name))continue;const g=groups.find(x=>x.name===e.group);
+    await put({id:newId(),lib:e.key,name:e.name,group:g?g.id:NONE,photo:e.img,weight:0,step:2.5,created:now+n,updated:now+n,history:[]});n++}
+  await load();return n}
+async function libInit(){if(await metaGet('libDone'))return;await metaPut('libDone',1);
+  if(!machines.length){await addLibrary();return}
+  if(confirm('להוסיף את ספריית התרגילים?\n(כ-30 תרגילים נפוצים עם איורים. התרגילים והנתונים שלך לא ישתנו)')){const n=await addLibrary();toast(`נוספו ${n} תרגילים מובנים`,null)}}
 // ===== body tracking =====
 let body=[],view='machines';
 const saveBody=()=>metaPut('body',body);
@@ -137,5 +146,5 @@ function setView(v){view=v;document.querySelectorAll('.vt').forEach(b=>b.classLi
 document.querySelectorAll('.vt').forEach(b=>b.onclick=()=>setView(b.dataset.v));
 $('#addBtn').onclick=()=>view==='body'?openBody(null):openForm(null);
 $('#rM15').onclick=()=>adjRest(-15);$('#rP15').onclick=()=>adjRest(15);$('#rSkip').onclick=stopRest;$('#restSet').onclick=restPresets;
-openDB().then(loadGroups).then(async()=>{body=(await metaGet('body'))||[];sessions=(await metaGet('sessions'))||[];session=(await metaGet('active'))||null;renderSessBar();renderRest()}).then(load).then(()=>setView('machines'));
+openDB().then(loadGroups).then(async()=>{body=(await metaGet('body'))||[];sessions=(await metaGet('sessions'))||[];session=(await metaGet('active'))||null;renderSessBar();renderRest()}).then(load).then(()=>setView('machines')).then(libInit);
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');

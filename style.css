@@ -54,3 +54,6 @@ body:has(.restbar:not([hidden])) .fab{bottom:100px}body:has(.restbar:not([hidden
 body:has(.restbar:not([hidden])) .sheet{bottom:calc(84px + env(safe-area-inset-bottom));padding-bottom:18px;max-height:calc(92vh - 84px)}
 .restbar{height:calc(84px + env(safe-area-inset-bottom))}
 .toast,body:has(.restbar:not([hidden])) .toast{bottom:auto;top:calc(10px + env(safe-area-inset-top))}
+
+#eV{cursor:pointer}#eV::after{content:' ✎';font-size:16px;opacity:.5}
+.card img[src$='.svg']{object-fit:cover}
