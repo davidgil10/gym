@@ -4,13 +4,15 @@
 <link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes"><link rel="stylesheet" href="style.css"></head><body>
 <header><h1>🏋️ המשקלים שלי</h1><button id="menuBtn" class="icon" aria-label="תפריט">⋮</button></header>
-<div class="views"><button class="vt on" data-v="machines">🏋️ מכשירים</button><button class="vt" data-v="body">📊 הגוף שלי</button></div>
+<div class="views"><button class="vt on" data-v="machines">🏋️ מכשירים</button><button class="vt" data-v="body">⚖️ הגוף שלי</button><button class="vt" data-v="reports">📊 דוחות</button></div>
+<div id="sessBar" class="sessbar"></div>
 <nav id="chips" class="chips"></nav>
 <main id="grid"></main>
-<section id="bodyView" hidden></section>
+<section id="bodyView" hidden></section><section id="repView" hidden></section>
 <p id="empty" class="empty" hidden>עוד אין מכשירים.<br>לחץ על ＋ כדי להוסיף את הראשון.</p>
 <button id="addBtn" class="fab" aria-label="הוסף מכשיר">＋</button>
+<div id="restBar" class="restbar" hidden><button class="rb" id="rM15">−15</button><div class="rc" id="restSet"><div id="restL">⏱️ מנוחה</div><div id="restT" class="rt">1:30</div></div><button class="rb" id="rP15">+15</button><button class="rb" id="rSkip">דלג</button></div>
 <div id="toast" class="toast" hidden><span id="toastMsg"></span><button id="undoBtn">ביטול</button></div>
 <div id="sheetBg" class="sheet-bg" hidden></div><section id="sheet" class="sheet" hidden></section>
 <input type="file" id="importFile" accept="application/json,.json" hidden>
-<script src="app.js"></script></body></html>
+<script src="journal.js"></script><script src="app.js"></script></body></html>

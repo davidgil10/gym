@@ -30,7 +30,7 @@ function render(){
   else{const ms=machines.filter(m=>m.group===filter);$('#grid').innerHTML=ms.length?ms.map(card).join(''):'<p class="sec-empty">אין עדיין מכשירים בקבוצה הזו</p>'}
 }
 $('#chips').addEventListener('click',e=>{const c=e.target.closest('.chip');if(!c)return;if(c.id==='mgGroups')return openGroups();filter=c.dataset.g;render();scrollTo(0,0)});
-$('#grid').addEventListener('click',e=>{const c=e.target.closest('.card');if(c)openEdit(c.dataset.id)});
+$('#grid').addEventListener('click',e=>{const c=e.target.closest('.card');if(c)(session?openLog:openEdit)(c.dataset.id)});
 // image compress
 function compress(file,max=900,q=.75){return new Promise((res,rej)=>{const img=new Image();const u=URL.createObjectURL(file);img.onload=()=>{let{width:w,height:h}=img;const k=Math.min(1,max/Math.max(w,h));w=Math.round(w*k);h=Math.round(h*k);const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);URL.revokeObjectURL(u);res(c.toDataURL('image/jpeg',q))};img.onerror=rej;img.src=u})}
 // sheet
@@ -75,20 +75,21 @@ function openEdit(id){const m=machines.find(x=>x.id===id);if(!m)return closeShee
   $('#eCancel').onclick=closeSheet;$('#eDet').onclick=()=>openForm(m);
   $('#eSave').onclick=async()=>{const before=structuredClone(m);const now=Date.now();m.weight=v;m.step=step;m.updated=now;m.history.push({t:now,w:v});await put(m);closeSheet();await load();
     toast(`${m.name}: ${fmt(v)} ק״ג נשמר`,async()=>{await put(before);await load()})}}
-let tt;function toast(msg,undo){$('#toastMsg').textContent=msg;$('#toast').hidden=false;clearTimeout(tt);
+let tt;function toast(msg,undo){$('#toastMsg').textContent=msg;$('#toast').hidden=false;clearTimeout(tt);$('#undoBtn').hidden=!undo;
   $('#undoBtn').onclick=async()=>{$('#toast').hidden=true;await undo()};tt=setTimeout(()=>$('#toast').hidden=true,6000)}
 // menu: backup
 $('#menuBtn').onclick=()=>{openSheet(`<h2>גיבוי</h2><p style="opacity:.8;font-size:14px">הנתונים שמורים רק בטלפון הזה. מומלץ לייצא גיבוי מדי פעם.</p>
   <button class="btn" id="mExp">⬇️ ייצוא גיבוי (JSON)</button><button class="btn" id="mImp">⬆️ ייבוא גיבוי</button><button class="btn" id="mClose">סגור</button>`);
   $('#mClose').onclick=closeSheet;
-  $('#mExp').onclick=()=>{const b=new Blob([JSON.stringify({app:'gym-weights',v:2,exported:Date.now(),groups,machines,body},null,1)],{type:'application/json'});
+  $('#mExp').onclick=()=>{const b=new Blob([JSON.stringify({app:'gym-weights',v:2,exported:Date.now(),groups,machines,body,sessions},null,1)],{type:'application/json'});
     const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`gym-backup-${new Date().toISOString().slice(0,10)}.json`;a.click()};
   $('#mImp').onclick=()=>$('#importFile').click()};
 $('#importFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text());const list=d.machines||d;if(!Array.isArray(list))throw 0;
+  if(Array.isArray(d.sessions))for(const x of d.sessions){if(x&&x.id&&x.start&&Array.isArray(x.sets)&&!sessions.some(y=>y.id===x.id))sessions.push(x)}
   if(Array.isArray(d.body))for(const e of d.body){if(e&&e.id&&e.date&&!body.some(x=>x.id===e.id))body.push(e)}
   if(Array.isArray(d.groups))for(const g of d.groups){if(g&&g.id&&g.name&&!groups.some(x=>x.id===g.id))groups.push({id:g.id,name:g.name})}
   if(!confirm(`לייבא ${list.length} מכשירים? מכשירים קיימים עם אותו מזהה יוחלפו.`))return;
-  for(const m of list){if(!m.id||!m.name||typeof m.weight!=='number')continue;m.history=m.history||[{t:m.updated||Date.now(),w:m.weight}];await put(m)}await saveGroups();await saveBody();closeSheet();renderBody();load();alert('הייבוא הושלם')}catch{alert('קובץ גיבוי לא תקין')}e.target.value=''};
+  for(const m of list){if(!m.id||!m.name||typeof m.weight!=='number')continue;m.history=m.history||[{t:m.updated||Date.now(),w:m.weight}];await put(m)}await saveGroups();await saveBody();await saveSessions();closeSheet();renderBody();load();alert('הייבוא הושלם')}catch{alert('קובץ גיבוי לא תקין')}e.target.value=''};
 function openGroups(){openSheet(`<h2>קבוצות שרירים</h2><ul class="hist">${groups.map(g=>`<li><span>${esc(g.name)} <small>(${machines.filter(m=>m.group===g.id).length})</small></span><span><button class="link" data-ren="${g.id}">✏️ שנה שם</button><button class="link" data-del="${g.id}" style="color:#f87171">🗑️ מחק</button></span></li>`).join('')}</ul>
   <label>קבוצה חדשה</label><div class="row"><input type="text" id="gNew" placeholder="למשל: ישבן"><button class="btn pri" id="gAdd" style="width:auto;margin:0">הוסף</button></div><button class="btn" id="gClose">סגור</button>`);
   $('#gClose').onclick=closeSheet;
@@ -129,11 +130,12 @@ function openBody(e){const last=sorted().slice(-1)[0]||{};
   $('#bSave').onclick=async()=>{const num=id=>{const v=$('#'+id).value.trim();return v===''?null:r1(parseFloat(v))};const w=num('bW'),f=num('bF'),date=$('#bD').value||today();
     if(w==null&&f==null)return alert('צריך למלא משקל או אחוז שומן');if((w!=null&&!(w>0&&w<500))||(f!=null&&!(f>0&&f<80)))return alert('ערך לא תקין');
     const before=structuredClone(body);if(e)Object.assign(e,{date,w,f});else body.push({id:newId(),date,w,f,t:Date.now()});
-    await saveBody();closeSheet();renderBody();toast(e?'הרישום עודכן':'הרישום נשמר',async()=>{body=before;await saveBody();renderBody()})};
-  if(e)$('#bDel').onclick=async()=>{if(!confirm(`למחוק את הרישום מ-${fd(e.date)}?`))return;const before=structuredClone(body);body=body.filter(x=>x!==e);await saveBody();closeSheet();renderBody();toast('הרישום נמחק',async()=>{body=before;await saveBody();renderBody()})}}
+    await saveBody();await saveSessions();closeSheet();renderBody();toast(e?'הרישום עודכן':'הרישום נשמר',async()=>{body=before;await saveBody();renderBody()})};
+  if(e)$('#bDel').onclick=async()=>{if(!confirm(`למחוק את הרישום מ-${fd(e.date)}?`))return;const before=structuredClone(body);body=body.filter(x=>x!==e);await saveBody();await saveSessions();closeSheet();renderBody();toast('הרישום נמחק',async()=>{body=before;await saveBody();renderBody()})}}
 function setView(v){view=v;document.querySelectorAll('.vt').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
-  $('#chips').hidden=$('#grid').hidden=v!=='machines';$('#empty').hidden=v!=='machines'||machines.length>0;$('#bodyView').hidden=v!=='body';if(v==='body')renderBody();scrollTo(0,0)}
+  $('#chips').hidden=$('#grid').hidden=v!=='machines';$('#empty').hidden=v!=='machines'||machines.length>0;$('#bodyView').hidden=v!=='body';$('#repView').hidden=v!=='reports';$('#addBtn').hidden=v==='reports';if(v==='body')renderBody();if(v==='reports')renderReports();scrollTo(0,0)}
 document.querySelectorAll('.vt').forEach(b=>b.onclick=()=>setView(b.dataset.v));
 $('#addBtn').onclick=()=>view==='body'?openBody(null):openForm(null);
-openDB().then(loadGroups).then(async()=>{body=(await metaGet('body'))||[]}).then(load).then(()=>setView('machines'));
+$('#rM15').onclick=()=>adjRest(-15);$('#rP15').onclick=()=>adjRest(15);$('#rSkip').onclick=stopRest;$('#restSet').onclick=restPresets;
+openDB().then(loadGroups).then(async()=>{body=(await metaGet('body'))||[];sessions=(await metaGet('sessions'))||[];session=(await metaGet('active'))||null;renderSessBar();renderRest()}).then(load).then(()=>setView('machines'));
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');
