@@ -68,11 +68,11 @@ function agg(list){const ex={},grp={};let v=0,t=0,n=0;
     for(const k in ex)if(ex[k]._s===s.id&&ex[k]._first===undefined)ex[k]._first=s.id;
   }
   // firstMax = max of first session containing exercise
-  for(const k in ex){const ss=list.filter(s=>s.sets.some(x=>x.mid===k));ex[k].firstMax=Math.max(...ss[0].sets.filter(x=>x.mid===k).map(x=>x.w));ex[k].lastMax=Math.max(...ss[ss.length-1].sets.filter(x=>x.mid===k).map(x=>x.w))}
+  for(const k in ex){const ss=list.filter(s=>s.sets.some(x=>x.mid===k));const ssP=ss.filter(s=>s.sets.some(x=>x.mid===k&&x.w>0));const mx=s=>Math.max(...s.sets.filter(x=>x.mid===k).map(x=>x.w));ex[k].firstMax=ssP.length?mx(ssP[0]):0;ex[k].lastMax=ssP.length?mx(ssP[ssP.length-1]):0}
   return{count:list.length,time:t,vol:v,sets:n,grp,ex}}
 function prsOf(s){const out=[];const ids=[...new Set(s.sets.map(x=>x.mid))];
   for(const id of ids){const mx=Math.max(...s.sets.filter(x=>x.mid===id).map(x=>x.w));
-    const before=sessions.filter(o=>o.id!==s.id&&o.start<s.start).flatMap(o=>o.sets.filter(x=>x.mid===id).map(x=>x.w));
+    const before=sessions.filter(o=>o.id!==s.id&&o.start<s.start).flatMap(o=>o.sets.filter(x=>x.mid===id&&x.w>0).map(x=>x.w));
     if(before.length&&mx>Math.max(...before))out.push({id,name:mName(s.sets.find(x=>x.mid===id)),w:mx,prev:Math.max(...before)})}
   return out}
 function sessionText(s){const a=agg([s]),pr=prsOf(s);let t=`🏋️ אימון ${fdate(s.start)} ${hm(s.start)}\n⏱️ ${durTxt(s.end-s.start)} · ${a.sets} סטים · נפח ${nf(a.vol)} ק״ג\n`;

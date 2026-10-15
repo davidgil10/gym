@@ -16,9 +16,10 @@ const newId=()=>crypto.randomUUID?crypto.randomUUID():Date.now()+''+Math.random(
 async function loadGroups(){groups=await metaGet('groups');if(!groups){groups=DEF.map((n,i)=>({id:'g'+(i+1),name:n}));await metaPut('groups',groups)}}
 const saveGroups=()=>metaPut('groups',groups);
 async function load(){machines=(await all()).sort((a,b)=>a.created-b.created);for(const m of machines)if(!m.group||!groups.some(g=>g.id===m.group))m.group=NONE;
+  for(const m of machines){const h=(m.history||[]).filter(x=>x.w>0);let ch=h.length!==(m.history||[]).length;if(!h.length&&m.weight>0){h.push({t:m.updated||Date.now(),w:m.weight});ch=true}if(ch){m.history=h;await put(m)}}
   for(const m of machines){const L=m.lib&&typeof LIBRARY!=='undefined'&&LIBRARY.find(e=>e.key===m.lib);if(L&&typeof m.photo==='string'&&m.photo.startsWith('img/')&&m.photo!==L.img){m.photo=L.img;await put(m)}}render()}
 const sgn=n=>(n>0?'+':n<0?'−':'')+fmt(Math.abs(n));
-const fromStart=m=>{const s0=m.history[0]?m.history[0].w:m.weight,d=m.weight-s0;if(!d)return'';const pc=s0?` (${sgn(d/s0*100).replace(/(\.\d)\d+/,'$1')}%)`:'';return `<span style="color:${d>0?'#4ade80':'#f87171'}"><bdi dir="ltr">${sgn(d)}</bdi> ק״ג מההתחלה <bdi dir="ltr">${pc.trim()}</bdi></span>`};
+const fromStart=m=>{const f=m.history.find(h=>h.w>0);if(!f||!(m.weight>0))return'';const s0=f.w,d=m.weight-s0;if(!d)return'';const pc=s0?` (${sgn(d/s0*100).replace(/(\.\d)\d+/,'$1')}%)`:'';return `<span style="color:${d>0?'#4ade80':'#f87171'}"><bdi dir="ltr">${sgn(d)}</bdi> ק״ג מההתחלה <bdi dir="ltr">${pc.trim()}</bdi></span>`};
 const card=m=>`<button class="card" data-id="${m.id}">${m.photo?`<img src="${m.photo}" alt="">`:'<div class="ph">🏋️</div>'}
   <div class="ov"><div class="w">${m.weight?`${fmt(m.weight)} <small>ק״ג</small>`:'<small>משקל לא הוגדר</small>'}</div><div class="n">${esc(m.name)}</div><div class="d">${fromStart(m)}</div><div class="d">${m.history.length?`עודכן: ${fdate(m.updated)}`:'לחץ להגדרת משקל'}</div></div></button>`;
 function render(){
@@ -53,7 +54,7 @@ function openForm(m){const st={photo:m?m.photo:null};
   $('#fSave').onclick=async()=>{const name=$('#fName').value.trim();if(!name){$('#fName').focus();return alert('צריך שם לתרגיל')}
     const group=$('#fG').value;if(m){m.name=name;m.photo=st.photo;m.group=group;await put(m);await load();openEdit(m.id);return}
     const w=parseFloat($('#fW').value);if(!(w>=0))return alert('משקל לא תקין');const now=Date.now();
-    await put({id:newId(),name,group,photo:st.photo,weight:w,step:2.5,created:now,updated:now,history:[{t:now,w}]});closeSheet();load()};
+    await put({id:newId(),name,group,photo:st.photo,weight:w,step:2.5,created:now,updated:now,history:w>0?[{t:now,w}]:[]});closeSheet();load()};
   if(m)$('#fDel').onclick=async()=>{if(confirm(`למחוק את "${m.name}" כולל כל ההיסטוריה? אי אפשר לבטל.`)){await del(m.id);closeSheet();load()}}}
 
 // weight edit
@@ -75,7 +76,7 @@ function openEdit(id){const m=machines.find(x=>x.id===id);if(!m)return closeShee
   document.querySelectorAll('.steps button').forEach(b=>b.onclick=()=>{step=+b.dataset.s;upd()});
   $('#ePlus').onclick=()=>{v=Math.round((v+step)*100)/100;upd()};$('#eMinus').onclick=()=>{v=Math.max(0,Math.round((v-step)*100)/100);upd()};
   $('#eCancel').onclick=closeSheet;$('#eDet').onclick=()=>openForm(m);
-  $('#eSave').onclick=async()=>{const before=structuredClone(m);const now=Date.now();m.weight=v;m.step=step;m.updated=now;m.history.push({t:now,w:v});await put(m);closeSheet();await load();
+  $('#eSave').onclick=async()=>{const before=structuredClone(m);const now=Date.now();m.weight=v;m.step=step;m.updated=now;if(v>0)m.history.push({t:now,w:v});await put(m);closeSheet();await load();
     toast(`${m.name}: ${fmt(v)} ק״ג נשמר`,async()=>{await put(before);await load()})}}
 let tt;function toast(msg,undo){$('#toastMsg').textContent=msg;$('#toast').hidden=false;clearTimeout(tt);$('#undoBtn').hidden=!undo;
   $('#undoBtn').onclick=async()=>{$('#toast').hidden=true;await undo()};tt=setTimeout(()=>$('#toast').hidden=true,6000)}
