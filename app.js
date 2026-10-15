@@ -164,11 +164,11 @@ function statBox(k,unit,title,pctOfStart){const s=series(k);if(!s.length)return 
   return `<div class="stat"><div class="st">${title}</div><div class="sv">${fmt(cur)}<small>${unit}</small></div>
   ${s.length>1?`<div class="sc">מההתחלה: ${chg(cur-first,unit,pctOfStart?first:0)}</div><div class="sc">מהקודם: ${chg(cur-prev,unit,0)}</div>`:'<div class="sc">רישום ראשון</div>'}</div>`}
 function renderBody(){const el=$('#bodyView');const s=sorted().reverse();
-  el.innerHTML=`<div class="stats">${statBox('w',' ק״ג','משקל גוף',true)}${statBox('f','%','אחוז שומן',false)}</div>
+  el.innerHTML=`<button class="btn calc" id="navyBtn">🧮 מחשבון אחוז שומן (שיטת הצי האמריקאי)</button><div class="stats">${statBox('w',' ק״ג','משקל גוף',true)}${statBox('f','%','אחוז שומן',false)}</div>
   <h3 class="sec">משקל גוף</h3>${lineChart(series('w').map(e=>({v:e.w,d:e.date})),'#60a5fa')}
   <h3 class="sec">אחוז שומן</h3>${lineChart(series('f').map(e=>({v:e.f,d:e.date})),'#f59e0b')}
-  <h3 class="sec">היסטוריה</h3>${s.length?`<ul class="hist">${s.map(e=>`<li><span>${fd(e.date)}</span><span>${e.w!=null?fmt(e.w)+' ק״ג':''}${e.w!=null&&e.f!=null?' · ':''}${e.f!=null?fmt(e.f)+'%':''}</span><button class="link" data-be="${e.id}">✏️</button></li>`).join('')}</ul>`:'<p class="sec-empty">עוד אין רישומים. לחץ על ＋ כדי לרשום משקל ואחוז שומן.</p>'}`;
-  el.querySelectorAll('[data-be]').forEach(b=>b.onclick=()=>openBody(body.find(x=>x.id===b.dataset.be)))}
+  <h3 class="sec">היסטוריה</h3>${s.length?`<ul class="hist">${s.map(e=>`<li><span>${fd(e.date)}</span><span>${e.w!=null?fmt(e.w)+' ק״ג':''}${e.w!=null&&e.f!=null?' · ':''}${e.f!=null?fmt(e.f)+'%':''}${e.m?`<br><small class="muted">${navyMeasTxt(e.m)}</small>`:''}</span><button class="link" data-be="${e.id}">✏️</button></li>`).join('')}</ul>`:'<p class="sec-empty">עוד אין רישומים. לחץ על ＋ כדי לרשום משקל ואחוז שומן.</p>'}`;
+  $('#navyBtn').onclick=openNavy;el.querySelectorAll('[data-be]').forEach(b=>b.onclick=()=>openBody(body.find(x=>x.id===b.dataset.be)))}
 function stepper(id,label,val,unit){return `<label>${label}</label><div class="row"><button class="pm sm" data-st="${id}" data-d="-0.1">−</button><input type="number" id="${id}" inputmode="decimal" step="0.1" min="0" value="${val??''}" placeholder="לא חובה" style="text-align:center"><button class="pm sm" data-st="${id}" data-d="0.1">+</button></div>`}
 function openBody(e){const last=sorted().slice(-1)[0]||{};
   openSheet(`<h2>${e?'עריכת רישום':'רישום חדש'}</h2><label>תאריך</label><input type="date" id="bD" value="${e?e.date:today()}" max="${today()}">

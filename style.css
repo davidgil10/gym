@@ -65,3 +65,6 @@ body:has(.restbar:not([hidden])) .sheet{bottom:calc(84px + env(safe-area-inset-b
 
 .timer{font-variant-numeric:tabular-nums;font-size:72px;direction:ltr}.timer.cd{color:#fbbf24;font-size:96px}
 .btn.huge{padding:26px;font-size:26px}.btn.huge.stop{background:#dc2626}
+
+.btn.calc{margin:0 0 10px;background:#7c3aed}.navyres{text-align:center;background:#0f172a;border-radius:12px;padding:12px;margin:12px 0;font-size:16px}.navyres .bf{font-size:44px;font-weight:800;color:#fbbf24}
+.guide{margin-top:12px;background:#0f172a;border-radius:12px;padding:10px}.guide summary{font-weight:700;cursor:pointer}.guide li{margin:6px 0;font-size:14px}
