@@ -18,17 +18,24 @@ const saveGroups=()=>metaPut('groups',groups);
 async function load(){machines=(await all()).sort((a,b)=>a.created-b.created);for(const m of machines)if(!m.group||!groups.some(g=>g.id===m.group))m.group=NONE;
   const bwDone=(await metaGet('bwMigrated'))||[],todo=BW_KEYS.filter(k=>!bwDone.includes(k));
   if(todo.length){for(const m of machines)if(todo.includes(m.lib)&&!m.bw){m.bw=true;if(m.reps===undefined)m.reps=null;await put(m)}await metaPut('bwMigrated',[...bwDone,...todo])}
-  for(const m of machines){if(m.bw)continue;const h=(m.history||[]).filter(x=>x.w>0);let ch=h.length!==(m.history||[]).length;if(!h.length&&m.weight>0){h.push({t:m.updated||Date.now(),w:m.weight});ch=true}if(ch){m.history=h;await put(m)}}
+  const tDone=(await metaGet('timedMigrated'))||[],tTodo=TIMED_KEYS.filter(k=>!tDone.includes(k));
+  if(tTodo.length){for(const m of machines)if(tTodo.includes(m.lib)&&!m.timed)await makeTimed(m,true);await metaPut('timedMigrated',[...tDone,...tTodo])}
+  for(const m of machines){if(m.bw||m.timed)continue;const h=(m.history||[]).filter(x=>x.w>0);let ch=h.length!==(m.history||[]).length;if(!h.length&&m.weight>0){h.push({t:m.updated||Date.now(),w:m.weight});ch=true}if(ch){m.history=h;await put(m)}}
   for(const m of machines){const L=m.lib&&typeof LIBRARY!=='undefined'&&LIBRARY.find(e=>e.key===m.lib);if(L&&typeof m.photo==='string'&&m.photo.startsWith('img/')&&m.photo!==L.img){m.photo=L.img;await put(m)}}render()}
-const BW_KEYS=['pull-up','dips'];
+const BW_KEYS=['pull-up','dips','crunch','oblique-crunch'],TIMED_KEYS=['plank'],NEW_LIB_KEYS=['oblique-crunch'];
 const sgn=n=>(n>0?'+':n<0?'−':'')+fmt(Math.abs(n));
 const fromStart=m=>{const f=m.history.find(h=>h.w>0);if(!f||!(m.weight>0))return'';const s0=f.w,d=m.weight-s0;if(!d)return'';const pc=s0?` (${sgn(d/s0*100).replace(/(\.\d)\d+/,'$1')}%)`:'';return `<span style="color:${d>0?'#4ade80':'#f87171'}"><bdi dir="ltr">${sgn(d)}</bdi> ק״ג מההתחלה <bdi dir="ltr">${pc.trim()}</bdi></span>`};
+async function makeTimed(m,on){if(on){m.timed=true;m.bw=false;m.oldHistory=[...(m.oldHistory||[]),...(m.history||[])];m.history=m.timeHistory||[];m.secs=m.history.length?m.history[m.history.length-1].s:null}
+  else{m.timed=false;m.timeHistory=m.history;m.history=m.oldHistory||[];m.oldHistory=[]}await put(m)}
+const tBest=m=>m.history.length?Math.max(...m.history.map(h=>h.s||0)):null;
+const fromStartT=m=>{if(m.secs==null||!m.history.length)return'';const d=m.secs-m.history[0].s;if(!d)return'';return `<span style="color:${d>0?'#4ade80':'#f87171'}"><bdi dir="ltr">${d>0?'+':'−'}${mmss(Math.abs(d))}</bdi> מההתחלה</span>`};
 const fromStartBW=m=>{const f=m.history.find(h=>h.r!=null);if(!f||m.reps==null)return'';const dr=m.reps-f.r,dw=m.weight-(f.w||0),out=[];
   if(dr)out.push(`<span style="color:${dr>0?'#4ade80':'#f87171'}"><bdi dir="ltr">${dr>0?'+':'−'}${Math.abs(dr)}</bdi> חזרות</span>`);
   if(dw)out.push(`<span style="color:${dw>0?'#4ade80':'#f87171'}"><bdi dir="ltr">${sgn(dw)}</bdi> ק״ג</span>`);return out.length?out.join(' · ')+' מההתחלה':''};
 const bwBig=m=>m.reps==null?'<small>לא הוגדר</small>':`${m.reps} <small>חזרות</small>`;
 const bwSub=m=>m.reps==null?(m.weight>0?`<bdi dir="ltr">+${fmt(m.weight)}</bdi> ק״ג משקל נוסף`:''):(m.weight>0?`<bdi dir="ltr">+${fmt(m.weight)}</bdi> ק״ג משקל נוסף`:'משקל גוף');
-const card=m=>m.bw?`<button class="card" data-id="${m.id}">${m.photo?`<img src="${m.photo}" alt="">`:'<div class="ph">🏋️</div>'}
+const card=m=>m.timed?`<button class="card" data-id="${m.id}">${m.photo?`<img src="${m.photo}" alt="">`:'<div class="ph">⏱️</div>'}
+  <div class="ov"><div class="w">${m.secs==null?'<small>לא הוגדר זמן</small>':`<bdi dir="ltr">${mmss(m.secs)}</bdi>`}</div><div class="d">${m.secs==null?'':`⏱ שיא ${mmss(tBest(m))}`}</div><div class="n">${esc(m.name)}</div><div class="d">${fromStartT(m)}</div><div class="d">${m.history.length?`עודכן: ${fdate(m.updated)}`:'לחץ להפעלת סטופר'}</div></div></button>`:m.bw?`<button class="card" data-id="${m.id}">${m.photo?`<img src="${m.photo}" alt="">`:'<div class="ph">🏋️</div>'}
   <div class="ov"><div class="w">${bwBig(m)}</div><div class="d">${bwSub(m)}</div><div class="n">${esc(m.name)}</div><div class="d">${fromStartBW(m)}</div><div class="d">${m.history.length?`עודכן: ${fdate(m.updated)}`:'לחץ להגדרת חזרות ומשקל'}</div></div></button>`:`<button class="card" data-id="${m.id}">${m.photo?`<img src="${m.photo}" alt="">`:'<div class="ph">🏋️</div>'}
   <div class="ov"><div class="w">${m.weight?`${fmt(m.weight)} <small>ק״ג</small>`:'<small>משקל לא הוגדר</small>'}</div><div class="n">${esc(m.name)}</div><div class="d">${fromStart(m)}</div><div class="d">${m.history.length?`עודכן: ${fdate(m.updated)}`:'לחץ להגדרת משקל'}</div></div></button>`;
 function render(){
@@ -58,13 +65,14 @@ function openForm(m){const st={photo:m?m.photo:null};
   <label>שם התרגיל</label><input type="text" id="fName" value="${m?esc(m.name):''}" placeholder="למשל: לחיצת חזה">
   <label>אזור בגוף</label><select id="fG">${groups.map(g=>`<option value="${g.id}">${esc(g.name)}</option>`).join('')}<option value="${NONE}">ללא קטגוריה</option></select>
   <label class="chk"><input type="checkbox" id="fBW" ${m&&m.bw?'checked':''}> תרגיל משקל גוף (חזרות + משקל נוסף, 0 = משקל גוף)</label>
+  <label class="chk"><input type="checkbox" id="fTM" ${m&&m.timed?'checked':''}> תרגיל זמן (סטופר, בלי משקל)</label>
   ${m?'':'<label>משקל התחלתי (ק״ג)</label><input type="number" id="fW" inputmode="decimal" step="0.5" min="0" value="10">'}
   <button class="btn pri" id="fSave">שמור</button>${m?'<button class="btn danger" id="fDel">🗑️ מחק תרגיל</button>':''}<button class="btn" id="fCancel">ביטול</button>`);
-  $('#fG').value=m?m.group:(filter!=='all'?filter:(groups[0]||{id:NONE}).id);wirePhoto(st);$('#fCancel').onclick=m?()=>openEdit(m.id):closeSheet;
+  $('#fG').value=m?m.group:(filter!=='all'?filter:(groups[0]||{id:NONE}).id);$('#fBW').onchange=()=>{if($('#fBW').checked)$('#fTM').checked=false};$('#fTM').onchange=()=>{if($('#fTM').checked)$('#fBW').checked=false};wirePhoto(st);$('#fCancel').onclick=m?()=>openEdit(m.id):closeSheet;
   $('#fSave').onclick=async()=>{const name=$('#fName').value.trim();if(!name){$('#fName').focus();return alert('צריך שם לתרגיל')}
-    const group=$('#fG').value,bw=$('#fBW').checked;if(m){m.name=name;m.photo=st.photo;m.group=group;if(bw&&!m.bw){m.bw=true;if(m.reps===undefined)m.reps=null}else if(!bw&&m.bw)m.bw=false;await put(m);await load();openEdit(m.id);return}
+    const group=$('#fG').value,bw=$('#fBW').checked,tm=$('#fTM').checked;if(m){m.name=name;m.photo=st.photo;m.group=group;if(tm!==!!m.timed){await makeTimed(m,tm);await load();openEdit(m.id);return}if(bw&&!m.bw){m.bw=true;if(m.reps===undefined)m.reps=null}else if(!bw&&m.bw)m.bw=false;await put(m);await load();openEdit(m.id);return}
     const w=parseFloat($('#fW').value);if(!(w>=0))return alert('משקל לא תקין');const now=Date.now();
-    await put({id:newId(),name,group,...(bw?{bw:true,reps:null}:{}),photo:st.photo,weight:w,step:2.5,created:now,updated:now,history:(w>0&&!bw)?[{t:now,w}]:[]});closeSheet();load()};
+    await put({id:newId(),name,group,...(tm?{timed:true,secs:null}:bw?{bw:true,reps:null}:{}),photo:st.photo,weight:w,step:2.5,created:now,updated:now,history:(w>0&&!bw&&!tm)?[{t:now,w}]:[]});closeSheet();load()};
   if(m)$('#fDel').onclick=async()=>{if(confirm(`למחוק את "${m.name}" כולל כל ההיסטוריה? אי אפשר לבטל.`)){await del(m.id);closeSheet();load()}}}
 
 function openEditBW(m){let r=m.reps==null?8:m.reps,w=m.weight||0,step=m.step||2.5;const hist=[...m.history].reverse();
@@ -87,7 +95,7 @@ function openEditBW(m){let r=m.reps==null?8:m.reps,w=m.weight||0,step=m.step||2.
 function chart(h){if(h.length<2)return'';const W=300,H=90,p=10,ws=h.map(x=>x.w),mn=Math.min(...ws),mx=Math.max(...ws),r=mx-mn||1;
   const pts=h.map((x,i)=>[W-p-(i*(W-2*p)/(h.length-1)),H-p-((x.w-mn)/r)*(H-2*p)]);
   return `<svg class="chart" viewBox="0 0 ${W} ${H}"><polyline fill="none" stroke="#22c55e" stroke-width="3" points="${pts.map(q=>q.join(',')).join(' ')}"/>${pts.map(q=>`<circle cx="${q[0]}" cy="${q[1]}" r="4" fill="#22c55e"/>`).join('')}</svg>`}
-function openEdit(id){const m=machines.find(x=>x.id===id);if(!m)return closeSheet();if(m.bw)return openEditBW(m);let v=m.weight,step=m.step||2.5;
+function openEdit(id){const m=machines.find(x=>x.id===id);if(!m)return closeSheet();if(m.timed)return openTimed(m);if(m.bw)return openEditBW(m);let v=m.weight,step=m.step||2.5;
   const hist=[...m.history].reverse();
   openSheet(`<div class="row between"><h2>${esc(m.name)} <small class="gtag">${esc(gName(m.group))}</small></h2><button class="link" id="eDet">✏️ עריכה</button></div>
   <div class="big" id="eV"></div><div class="delta" id="eD"></div>
@@ -130,9 +138,13 @@ function openGroups(){openSheet(`<h2>קבוצות שרירים</h2><ul class="hi
 // ===== built-in exercise library =====
 async function addLibrary(){const have=new Set(machines.map(m=>m.name.trim()));let n=0,now=Date.now();
   for(const e of LIBRARY){if(have.has(e.name))continue;const g=groups.find(x=>x.name===e.group);
-    await put({id:newId(),lib:e.key,...(BW_KEYS.includes(e.key)?{bw:true,reps:null}:{}),name:e.name,group:g?g.id:NONE,photo:e.img,weight:0,step:2.5,created:now+n,updated:now+n,history:[]});n++}
+    await put({id:newId(),lib:e.key,...(BW_KEYS.includes(e.key)?{bw:true,reps:null}:TIMED_KEYS.includes(e.key)?{timed:true,secs:null}:{}),name:e.name,group:g?g.id:NONE,photo:e.img,weight:0,step:2.5,created:now+n,updated:now+n,history:[]});n++}
   await load();return n}
-async function libInit(){if(await metaGet('libDone'))return;await metaPut('libDone',1);
+async function libInit(){if(await metaGet('libDone')){const done=(await metaGet('libNewAdded'))||[],todo=NEW_LIB_KEYS.filter(k=>!done.includes(k));
+    if(todo.length){let n=0;const have=new Set(machines.map(m=>m.name.trim()));for(const e of LIBRARY.filter(e=>todo.includes(e.key)&&!have.has(e.name))){const g=groups.find(x=>x.name===e.group);
+      await put({id:newId(),lib:e.key,...(BW_KEYS.includes(e.key)?{bw:true,reps:null}:{}),name:e.name,group:g?g.id:NONE,photo:e.img,weight:0,step:2.5,created:Date.now()+n,updated:Date.now(),history:[]});n++}
+      await metaPut('libNewAdded',[...done,...todo]);if(n){await load();toast(`נוסף תרגיל חדש לספרייה: ${LIBRARY.filter(e=>todo.includes(e.key)).map(e=>e.name).join(', ')}`,null)}}return}
+  await metaPut('libDone',1);await metaPut('libNewAdded',NEW_LIB_KEYS);
   if(!machines.length){await addLibrary();return}
   if(confirm('להוסיף את ספריית התרגילים?\n(כ-30 תרגילים נפוצים עם איורים. התרגילים והנתונים שלך לא ישתנו)')){const n=await addLibrary();toast(`נוספו ${n} תרגילים מובנים`,null)}}
 // ===== body tracking =====
@@ -174,7 +186,7 @@ function setView(v){view=v;document.querySelectorAll('.vt').forEach(b=>b.classLi
 document.querySelectorAll('.vt').forEach(b=>b.onclick=()=>setView(b.dataset.v));
 $('#addBtn').onclick=()=>view==='body'?openBody(null):openForm(null);
 $('#rM15').onclick=()=>adjRest(-15);$('#rP15').onclick=()=>adjRest(15);$('#rSkip').onclick=stopRest;$('#restSet').onclick=restPresets;
-openDB().then(loadGroups).then(async()=>{body=(await metaGet('body'))||[];sessions=(await metaGet('sessions'))||[];session=(await metaGet('active'))||null;renderSessBar();renderRest()}).then(load).then(()=>setView('machines')).then(libInit);
+openDB().then(loadGroups).then(async()=>{body=(await metaGet('body'))||[];sessions=(await metaGet('sessions'))||[];session=(await metaGet('active'))||null;renderSessBar();renderRest()}).then(load).then(()=>setView('machines')).then(libInit).then(resumeTimer);
 // ===== updates =====
 if('serviceWorker' in navigator){let clicked=false,reloaded=false;
   const showUpd=w=>{const b=$('#updBar');b.hidden=false;b.onclick=()=>{clicked=true;b.textContent='מעדכן…';w.postMessage({type:'SKIP_WAITING'})}};

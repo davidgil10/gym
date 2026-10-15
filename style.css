@@ -62,3 +62,6 @@ body:has(.restbar:not([hidden])) .sheet{bottom:calc(84px + env(safe-area-inset-b
 
 .updbar{position:fixed;top:0;left:0;right:0;z-index:30;padding:14px;padding-top:max(14px,env(safe-area-inset-top));background:#f59e0b;color:#111;font-size:17px;font-weight:700;border-radius:0}
 .ver{text-align:center;font-size:12px;opacity:.5;margin-top:14px}
+
+.timer{font-variant-numeric:tabular-nums;font-size:72px;direction:ltr}.timer.cd{color:#fbbf24;font-size:96px}
+.btn.huge{padding:26px;font-size:26px}.btn.huge.stop{background:#dc2626}
