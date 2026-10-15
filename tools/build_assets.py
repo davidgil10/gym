@@ -22,10 +22,10 @@ import datetime
 ver=f"{datetime.date.today():%Y.%m.%d}-{h}"
 open(R+'/library.js','a').write(f"const APP_VERSION='{ver}';\n")
 sw=f"""// version {ver}
-const C='gym-{h}',MARK='gym-upd-protocol',F={json.dumps(F)};
+const VER='{ver}',C='gym-{h}',MARK='gym-upd-protocol',F={json.dumps(F)};
 self.addEventListener('install',e=>{{e.waitUntil((async()=>{{const c=await caches.open(C);await Promise.all(F.map(u=>fetch(u,{{cache:'reload'}}).then(r=>{{if(!r.ok)throw new Error(u);return c.put(u,r)}})));
   if(!(await caches.has(MARK)))self.skipWaiting();}})())}});
-self.addEventListener('message',e=>{{if(e.data&&e.data.type==='SKIP_WAITING')self.skipWaiting()}});
+self.addEventListener('message',e=>{{if(!e.data)return;if(e.data.type==='SKIP_WAITING')self.skipWaiting();if(e.data.type==='VERSION'&&e.ports[0])e.ports[0].postMessage(VER)}});
 self.addEventListener('activate',e=>{{e.waitUntil((async()=>{{await caches.open(MARK);for(const k of await caches.keys())if(k!==C&&k!==MARK)await caches.delete(k);await self.clients.claim()}})())}});
 self.addEventListener('fetch',e=>{{const q=e.request;if(q.method!=='GET'||new URL(q.url).origin!==location.origin)return;
   e.respondWith(fetch(q,{{cache:'no-cache'}}).then(r=>{{if(r.ok){{const c=r.clone();caches.open(C).then(x=>x.put(q,c))}}return r}}).catch(()=>caches.match(q,{{ignoreSearch:true}}).then(r=>r||caches.match('./'))))}});

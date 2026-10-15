@@ -192,7 +192,10 @@ if('serviceWorker' in navigator){let clicked=false,reloaded=false;
   const showUpd=w=>{const b=$('#updBar');b.hidden=false;b.onclick=()=>{clicked=true;b.textContent='מעדכן…';w.postMessage({type:'SKIP_WAITING'})}};
   navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!clicked||reloaded)return;reloaded=true;location.reload()});
   navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(reg=>{
-    const check=()=>{if(reg.waiting&&navigator.serviceWorker.controller)showUpd(reg.waiting)};check();
-    reg.addEventListener('updatefound',()=>{const w=reg.installing;if(w)w.addEventListener('statechange',()=>{if(w.state==='installed')check()})});
+    const askVer=w=>new Promise(r=>{const ch=new MessageChannel();ch.port1.onmessage=e=>r(e.data);w.postMessage({type:'VERSION'},[ch.port2]);setTimeout(()=>r(null),3000)});
+    const check=async()=>{const w=reg.waiting;if(!w||!navigator.serviceWorker.controller)return;
+      if(typeof APP_VERSION!=='undefined'&&(await askVer(w))===APP_VERSION){w.postMessage({type:'SKIP_WAITING'});return}showUpd(w)};
+    const watch=w=>{if(w)w.addEventListener('statechange',()=>{if(w.state==='installed')check()})};
+    check();watch(reg.installing);reg.addEventListener('updatefound',()=>watch(reg.installing));
     const upd=()=>reg.update().catch(()=>{});upd();
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)upd()});addEventListener('focus',upd);setInterval(upd,30*60*1000)}).catch(()=>{})}
