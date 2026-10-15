@@ -108,7 +108,7 @@ let tt;function toast(msg,undo){$('#toastMsg').textContent=msg;$('#toast').hidde
   $('#undoBtn').onclick=async()=>{$('#toast').hidden=true;await undo()};tt=setTimeout(()=>$('#toast').hidden=true,6000)}
 // menu: backup
 $('#menuBtn').onclick=()=>{openSheet(`<h2>גיבוי</h2><p style="opacity:.8;font-size:14px">הנתונים שמורים רק בטלפון הזה. מומלץ לייצא גיבוי מדי פעם.</p>
-  <button class="btn" id="mLib">📚 שחזר תרגילים מובנים</button><button class="btn" id="mExp">⬇️ ייצוא גיבוי (JSON)</button><button class="btn" id="mImp">⬆️ ייבוא גיבוי</button><button class="btn" id="mClose">סגור</button>`);
+  <button class="btn" id="mLib">📚 שחזר תרגילים מובנים</button><button class="btn" id="mExp">⬇️ ייצוא גיבוי (JSON)</button><button class="btn" id="mImp">⬆️ ייבוא גיבוי</button><button class="btn" id="mClose">סגור</button><p class="ver">גרסה ${typeof APP_VERSION!=='undefined'?APP_VERSION:'?'}</p>`);
   $('#mClose').onclick=closeSheet;$('#mLib').onclick=async()=>{const n=await addLibrary();closeSheet();toast(n?`נוספו ${n} תרגילים מובנים`:'כל התרגילים המובנים כבר קיימים',null)};
   $('#mExp').onclick=()=>{const b=new Blob([JSON.stringify({app:'gym-weights',v:2,exported:Date.now(),groups,machines,body,sessions},null,1)],{type:'application/json'});
     const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`gym-backup-${new Date().toISOString().slice(0,10)}.json`;a.click()};
@@ -175,4 +175,12 @@ document.querySelectorAll('.vt').forEach(b=>b.onclick=()=>setView(b.dataset.v));
 $('#addBtn').onclick=()=>view==='body'?openBody(null):openForm(null);
 $('#rM15').onclick=()=>adjRest(-15);$('#rP15').onclick=()=>adjRest(15);$('#rSkip').onclick=stopRest;$('#restSet').onclick=restPresets;
 openDB().then(loadGroups).then(async()=>{body=(await metaGet('body'))||[];sessions=(await metaGet('sessions'))||[];session=(await metaGet('active'))||null;renderSessBar();renderRest()}).then(load).then(()=>setView('machines')).then(libInit);
-if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');
+// ===== updates =====
+if('serviceWorker' in navigator){let clicked=false,reloaded=false;
+  const showUpd=w=>{const b=$('#updBar');b.hidden=false;b.onclick=()=>{clicked=true;b.textContent='מעדכן…';w.postMessage({type:'SKIP_WAITING'})}};
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!clicked||reloaded)return;reloaded=true;location.reload()});
+  navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(reg=>{
+    const check=()=>{if(reg.waiting&&navigator.serviceWorker.controller)showUpd(reg.waiting)};check();
+    reg.addEventListener('updatefound',()=>{const w=reg.installing;if(w)w.addEventListener('statechange',()=>{if(w.state==='installed')check()})});
+    const upd=()=>reg.update().catch(()=>{});upd();
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden)upd()});addEventListener('focus',upd);setInterval(upd,30*60*1000)}).catch(()=>{})}
