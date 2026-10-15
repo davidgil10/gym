@@ -1,0 +1,16 @@
+<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111827"><title>המשקלים שלי</title>
+<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes"><link rel="stylesheet" href="style.css"></head><body>
+<header><h1>🏋️ המשקלים שלי</h1><button id="menuBtn" class="icon" aria-label="תפריט">⋮</button></header>
+<div class="views"><button class="vt on" data-v="machines">🏋️ מכשירים</button><button class="vt" data-v="body">📊 הגוף שלי</button></div>
+<nav id="chips" class="chips"></nav>
+<main id="grid"></main>
+<section id="bodyView" hidden></section>
+<p id="empty" class="empty" hidden>עוד אין מכשירים.<br>לחץ על ＋ כדי להוסיף את הראשון.</p>
+<button id="addBtn" class="fab" aria-label="הוסף מכשיר">＋</button>
+<div id="toast" class="toast" hidden><span id="toastMsg"></span><button id="undoBtn">ביטול</button></div>
+<div id="sheetBg" class="sheet-bg" hidden></div><section id="sheet" class="sheet" hidden></section>
+<input type="file" id="importFile" accept="application/json,.json" hidden>
+<script src="app.js"></script></body></html>
