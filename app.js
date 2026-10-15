@@ -16,9 +16,11 @@ const newId=()=>crypto.randomUUID?crypto.randomUUID():Date.now()+''+Math.random(
 async function loadGroups(){groups=await metaGet('groups');if(!groups){groups=DEF.map((n,i)=>({id:'g'+(i+1),name:n}));await metaPut('groups',groups)}}
 const saveGroups=()=>metaPut('groups',groups);
 async function load(){machines=(await all()).sort((a,b)=>a.created-b.created);for(const m of machines)if(!m.group||!groups.some(g=>g.id===m.group))m.group=NONE;
-  for(const m of machines)if(m.lib==='pull-up'&&!m.bw){m.bw=true;if(m.reps===undefined)m.reps=null;await put(m)}
+  const bwDone=(await metaGet('bwMigrated'))||[],todo=BW_KEYS.filter(k=>!bwDone.includes(k));
+  if(todo.length){for(const m of machines)if(todo.includes(m.lib)&&!m.bw){m.bw=true;if(m.reps===undefined)m.reps=null;await put(m)}await metaPut('bwMigrated',[...bwDone,...todo])}
   for(const m of machines){if(m.bw)continue;const h=(m.history||[]).filter(x=>x.w>0);let ch=h.length!==(m.history||[]).length;if(!h.length&&m.weight>0){h.push({t:m.updated||Date.now(),w:m.weight});ch=true}if(ch){m.history=h;await put(m)}}
   for(const m of machines){const L=m.lib&&typeof LIBRARY!=='undefined'&&LIBRARY.find(e=>e.key===m.lib);if(L&&typeof m.photo==='string'&&m.photo.startsWith('img/')&&m.photo!==L.img){m.photo=L.img;await put(m)}}render()}
+const BW_KEYS=['pull-up','dips'];
 const sgn=n=>(n>0?'+':n<0?'−':'')+fmt(Math.abs(n));
 const fromStart=m=>{const f=m.history.find(h=>h.w>0);if(!f||!(m.weight>0))return'';const s0=f.w,d=m.weight-s0;if(!d)return'';const pc=s0?` (${sgn(d/s0*100).replace(/(\.\d)\d+/,'$1')}%)`:'';return `<span style="color:${d>0?'#4ade80':'#f87171'}"><bdi dir="ltr">${sgn(d)}</bdi> ק״ג מההתחלה <bdi dir="ltr">${pc.trim()}</bdi></span>`};
 const fromStartBW=m=>{const f=m.history.find(h=>h.r!=null);if(!f||m.reps==null)return'';const dr=m.reps-f.r,dw=m.weight-(f.w||0),out=[];
@@ -55,13 +57,14 @@ function openForm(m){const st={photo:m?m.photo:null};
   openSheet(`<h2>${m?'עריכת תרגיל':'תרגיל חדש'}</h2>${photoPicker(st.photo)}
   <label>שם התרגיל</label><input type="text" id="fName" value="${m?esc(m.name):''}" placeholder="למשל: לחיצת חזה">
   <label>אזור בגוף</label><select id="fG">${groups.map(g=>`<option value="${g.id}">${esc(g.name)}</option>`).join('')}<option value="${NONE}">ללא קטגוריה</option></select>
+  <label class="chk"><input type="checkbox" id="fBW" ${m&&m.bw?'checked':''}> תרגיל משקל גוף (חזרות + משקל נוסף, 0 = משקל גוף)</label>
   ${m?'':'<label>משקל התחלתי (ק״ג)</label><input type="number" id="fW" inputmode="decimal" step="0.5" min="0" value="10">'}
   <button class="btn pri" id="fSave">שמור</button>${m?'<button class="btn danger" id="fDel">🗑️ מחק תרגיל</button>':''}<button class="btn" id="fCancel">ביטול</button>`);
   $('#fG').value=m?m.group:(filter!=='all'?filter:(groups[0]||{id:NONE}).id);wirePhoto(st);$('#fCancel').onclick=m?()=>openEdit(m.id):closeSheet;
   $('#fSave').onclick=async()=>{const name=$('#fName').value.trim();if(!name){$('#fName').focus();return alert('צריך שם לתרגיל')}
-    const group=$('#fG').value;if(m){m.name=name;m.photo=st.photo;m.group=group;await put(m);await load();openEdit(m.id);return}
+    const group=$('#fG').value,bw=$('#fBW').checked;if(m){m.name=name;m.photo=st.photo;m.group=group;if(bw&&!m.bw){m.bw=true;if(m.reps===undefined)m.reps=null}else if(!bw&&m.bw)m.bw=false;await put(m);await load();openEdit(m.id);return}
     const w=parseFloat($('#fW').value);if(!(w>=0))return alert('משקל לא תקין');const now=Date.now();
-    await put({id:newId(),name,group,photo:st.photo,weight:w,step:2.5,created:now,updated:now,history:w>0?[{t:now,w}]:[]});closeSheet();load()};
+    await put({id:newId(),name,group,...(bw?{bw:true,reps:null}:{}),photo:st.photo,weight:w,step:2.5,created:now,updated:now,history:(w>0&&!bw)?[{t:now,w}]:[]});closeSheet();load()};
   if(m)$('#fDel').onclick=async()=>{if(confirm(`למחוק את "${m.name}" כולל כל ההיסטוריה? אי אפשר לבטל.`)){await del(m.id);closeSheet();load()}}}
 
 function openEditBW(m){let r=m.reps==null?8:m.reps,w=m.weight||0,step=m.step||2.5;const hist=[...m.history].reverse();
@@ -127,7 +130,7 @@ function openGroups(){openSheet(`<h2>קבוצות שרירים</h2><ul class="hi
 // ===== built-in exercise library =====
 async function addLibrary(){const have=new Set(machines.map(m=>m.name.trim()));let n=0,now=Date.now();
   for(const e of LIBRARY){if(have.has(e.name))continue;const g=groups.find(x=>x.name===e.group);
-    await put({id:newId(),lib:e.key,...(e.key==='pull-up'?{bw:true,reps:null}:{}),name:e.name,group:g?g.id:NONE,photo:e.img,weight:0,step:2.5,created:now+n,updated:now+n,history:[]});n++}
+    await put({id:newId(),lib:e.key,...(BW_KEYS.includes(e.key)?{bw:true,reps:null}:{}),name:e.name,group:g?g.id:NONE,photo:e.img,weight:0,step:2.5,created:now+n,updated:now+n,history:[]});n++}
   await load();return n}
 async function libInit(){if(await metaGet('libDone'))return;await metaPut('libDone',1);
   if(!machines.length){await addLibrary();return}
