@@ -57,3 +57,4 @@ body:has(.restbar:not([hidden])) .sheet{bottom:calc(84px + env(safe-area-inset-b
 
 #eV{cursor:pointer}#eV::after{content:' ✎';font-size:16px;opacity:.5}
 .card img[src$='.svg']{object-fit:cover}
+#wV{direction:ltr;unicode-bidi:isolate}

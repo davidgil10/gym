@@ -16,11 +16,18 @@ const newId=()=>crypto.randomUUID?crypto.randomUUID():Date.now()+''+Math.random(
 async function loadGroups(){groups=await metaGet('groups');if(!groups){groups=DEF.map((n,i)=>({id:'g'+(i+1),name:n}));await metaPut('groups',groups)}}
 const saveGroups=()=>metaPut('groups',groups);
 async function load(){machines=(await all()).sort((a,b)=>a.created-b.created);for(const m of machines)if(!m.group||!groups.some(g=>g.id===m.group))m.group=NONE;
-  for(const m of machines){const h=(m.history||[]).filter(x=>x.w>0);let ch=h.length!==(m.history||[]).length;if(!h.length&&m.weight>0){h.push({t:m.updated||Date.now(),w:m.weight});ch=true}if(ch){m.history=h;await put(m)}}
+  for(const m of machines)if(m.lib==='pull-up'&&!m.bw){m.bw=true;if(m.reps===undefined)m.reps=null;await put(m)}
+  for(const m of machines){if(m.bw)continue;const h=(m.history||[]).filter(x=>x.w>0);let ch=h.length!==(m.history||[]).length;if(!h.length&&m.weight>0){h.push({t:m.updated||Date.now(),w:m.weight});ch=true}if(ch){m.history=h;await put(m)}}
   for(const m of machines){const L=m.lib&&typeof LIBRARY!=='undefined'&&LIBRARY.find(e=>e.key===m.lib);if(L&&typeof m.photo==='string'&&m.photo.startsWith('img/')&&m.photo!==L.img){m.photo=L.img;await put(m)}}render()}
 const sgn=n=>(n>0?'+':n<0?'−':'')+fmt(Math.abs(n));
 const fromStart=m=>{const f=m.history.find(h=>h.w>0);if(!f||!(m.weight>0))return'';const s0=f.w,d=m.weight-s0;if(!d)return'';const pc=s0?` (${sgn(d/s0*100).replace(/(\.\d)\d+/,'$1')}%)`:'';return `<span style="color:${d>0?'#4ade80':'#f87171'}"><bdi dir="ltr">${sgn(d)}</bdi> ק״ג מההתחלה <bdi dir="ltr">${pc.trim()}</bdi></span>`};
-const card=m=>`<button class="card" data-id="${m.id}">${m.photo?`<img src="${m.photo}" alt="">`:'<div class="ph">🏋️</div>'}
+const fromStartBW=m=>{const f=m.history.find(h=>h.r!=null);if(!f||m.reps==null)return'';const dr=m.reps-f.r,dw=m.weight-(f.w||0),out=[];
+  if(dr)out.push(`<span style="color:${dr>0?'#4ade80':'#f87171'}"><bdi dir="ltr">${dr>0?'+':'−'}${Math.abs(dr)}</bdi> חזרות</span>`);
+  if(dw)out.push(`<span style="color:${dw>0?'#4ade80':'#f87171'}"><bdi dir="ltr">${sgn(dw)}</bdi> ק״ג</span>`);return out.length?out.join(' · ')+' מההתחלה':''};
+const bwBig=m=>m.reps==null?'<small>לא הוגדר</small>':`${m.reps} <small>חזרות</small>`;
+const bwSub=m=>m.reps==null?(m.weight>0?`<bdi dir="ltr">+${fmt(m.weight)}</bdi> ק״ג משקל נוסף`:''):(m.weight>0?`<bdi dir="ltr">+${fmt(m.weight)}</bdi> ק״ג משקל נוסף`:'משקל גוף');
+const card=m=>m.bw?`<button class="card" data-id="${m.id}">${m.photo?`<img src="${m.photo}" alt="">`:'<div class="ph">🏋️</div>'}
+  <div class="ov"><div class="w">${bwBig(m)}</div><div class="d">${bwSub(m)}</div><div class="n">${esc(m.name)}</div><div class="d">${fromStartBW(m)}</div><div class="d">${m.history.length?`עודכן: ${fdate(m.updated)}`:'לחץ להגדרת חזרות ומשקל'}</div></div></button>`:`<button class="card" data-id="${m.id}">${m.photo?`<img src="${m.photo}" alt="">`:'<div class="ph">🏋️</div>'}
   <div class="ov"><div class="w">${m.weight?`${fmt(m.weight)} <small>ק״ג</small>`:'<small>משקל לא הוגדר</small>'}</div><div class="n">${esc(m.name)}</div><div class="d">${fromStart(m)}</div><div class="d">${m.history.length?`עודכן: ${fdate(m.updated)}`:'לחץ להגדרת משקל'}</div></div></button>`;
 function render(){
   if(filter!=='all'&&filter!==NONE&&!groups.some(g=>g.id===filter))filter='all';
@@ -57,11 +64,27 @@ function openForm(m){const st={photo:m?m.photo:null};
     await put({id:newId(),name,group,photo:st.photo,weight:w,step:2.5,created:now,updated:now,history:w>0?[{t:now,w}]:[]});closeSheet();load()};
   if(m)$('#fDel').onclick=async()=>{if(confirm(`למחוק את "${m.name}" כולל כל ההיסטוריה? אי אפשר לבטל.`)){await del(m.id);closeSheet();load()}}}
 
+function openEditBW(m){let r=m.reps==null?8:m.reps,w=m.weight||0,step=m.step||2.5;const hist=[...m.history].reverse();
+  openSheet(`<div class="row between"><h2>${esc(m.name)} <small class="gtag">${esc(gName(m.group))}</small></h2><button class="link" id="eDet">✏️ עריכה</button></div>
+  <label>חזרות</label><div class="row"><button class="pm" id="rM">−</button><div class="val" id="rV"></div><button class="pm" id="rP">+</button></div>
+  <label>משקל נוסף (ק״ג) · 0 = משקל גוף</label><div class="row"><button class="pm" id="wM">−</button><div class="val" id="wV"></div><button class="pm" id="wP">+</button></div>
+  <div class="steps">${[1,2.5,5].map(s=>`<button data-s="${s}">קפיצה ${s}</button>`).join('')}</div><div class="delta" id="eD"></div>
+  <button class="btn pri" id="eSave" disabled>שמור</button><button class="btn" id="eCancel">סגור בלי לשמור</button>
+  <h2 style="margin-top:20px">התקדמות</h2><div class="delta">${fromStartBW(m)}</div>${chart(m.history.filter(x=>x.r!=null).map(x=>({t:x.t,w:x.r})))}
+  <ul class="hist">${hist.map(x=>`<li><span>${fdate(x.t)}</span><span>${x.r!=null?(x.w>0?`${x.r} חזרות · +${fmt(x.w)} ק״ג`:`${x.r} חזרות · משקל גוף`):`${fmt(x.w)} ק״ג`}</span></li>`).join('')}</ul>`);
+  const upd=()=>{$('#rV').textContent=r;$('#wV').textContent=w>0?'+'+fmt(w):'0';const ch=r!==m.reps||w!==(m.weight||0);$('#eSave').disabled=!ch;$('#eD').textContent=ch?'לחץ "שמור" כדי לעדכן':'';
+    document.querySelectorAll('.steps button').forEach(b=>b.classList.toggle('on',+b.dataset.s===step))};upd();
+  document.querySelectorAll('.steps button').forEach(b=>b.onclick=()=>{step=+b.dataset.s;upd()});
+  $('#rP').onclick=()=>{r++;upd()};$('#rM').onclick=()=>{r=Math.max(0,r-1);upd()};
+  $('#wP').onclick=()=>{w=Math.round((w+step)*100)/100;upd()};$('#wM').onclick=()=>{w=Math.max(0,Math.round((w-step)*100)/100);upd()};
+  $('#eCancel').onclick=closeSheet;$('#eDet').onclick=()=>openForm(m);
+  $('#eSave').onclick=async()=>{const before=structuredClone(m);const now=Date.now();m.reps=r;m.weight=w;m.step=step;m.updated=now;m.history.push({t:now,w,r});await put(m);closeSheet();await load();
+    toast(`${m.name}: ${w>0?`${r}×+${fmt(w)} ק״ג`:`${r} חזרות`} נשמר`,async()=>{await put(before);await load()})}}
 // weight edit
 function chart(h){if(h.length<2)return'';const W=300,H=90,p=10,ws=h.map(x=>x.w),mn=Math.min(...ws),mx=Math.max(...ws),r=mx-mn||1;
   const pts=h.map((x,i)=>[W-p-(i*(W-2*p)/(h.length-1)),H-p-((x.w-mn)/r)*(H-2*p)]);
   return `<svg class="chart" viewBox="0 0 ${W} ${H}"><polyline fill="none" stroke="#22c55e" stroke-width="3" points="${pts.map(q=>q.join(',')).join(' ')}"/>${pts.map(q=>`<circle cx="${q[0]}" cy="${q[1]}" r="4" fill="#22c55e"/>`).join('')}</svg>`}
-function openEdit(id){const m=machines.find(x=>x.id===id);if(!m)return closeSheet();let v=m.weight,step=m.step||2.5;
+function openEdit(id){const m=machines.find(x=>x.id===id);if(!m)return closeSheet();if(m.bw)return openEditBW(m);let v=m.weight,step=m.step||2.5;
   const hist=[...m.history].reverse();
   openSheet(`<div class="row between"><h2>${esc(m.name)} <small class="gtag">${esc(gName(m.group))}</small></h2><button class="link" id="eDet">✏️ עריכה</button></div>
   <div class="big" id="eV"></div><div class="delta" id="eD"></div>
@@ -104,7 +127,7 @@ function openGroups(){openSheet(`<h2>קבוצות שרירים</h2><ul class="hi
 // ===== built-in exercise library =====
 async function addLibrary(){const have=new Set(machines.map(m=>m.name.trim()));let n=0,now=Date.now();
   for(const e of LIBRARY){if(have.has(e.name))continue;const g=groups.find(x=>x.name===e.group);
-    await put({id:newId(),lib:e.key,name:e.name,group:g?g.id:NONE,photo:e.img,weight:0,step:2.5,created:now+n,updated:now+n,history:[]});n++}
+    await put({id:newId(),lib:e.key,...(e.key==='pull-up'?{bw:true,reps:null}:{}),name:e.name,group:g?g.id:NONE,photo:e.img,weight:0,step:2.5,created:now+n,updated:now+n,history:[]});n++}
   await load();return n}
 async function libInit(){if(await metaGet('libDone'))return;await metaPut('libDone',1);
   if(!machines.length){await addLibrary();return}

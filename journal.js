@@ -10,6 +10,11 @@ const nf=n=>Math.round(n).toLocaleString('he-IL');
 const pctTxt=(a,b)=>b?` (${a>=b?'+':'−'}${Math.abs(Math.round((a-b)/b*100))}%)`:'';
 const mName=x=>{const m=machines.find(y=>y.id===x.mid);return m?m.name:x.name};
 const mGroup=x=>{const m=machines.find(y=>y.id===x.mid);return m?gName(m.group):(x.gname||'ללא קטגוריה')};
+const isBW=mid=>{const m=machines.find(y=>y.id===mid);return !!(m&&m.bw)};
+const bwTxt=(w,r)=>w>0?`<bdi dir="ltr">${r}×+${fmt(w)}</bdi> ק״ג`:`${r} חזרות`;
+const setTxt=x=>isBW(x.mid)?bwTxt(x.w,x.r):`${fmt(x.w)}×${x.r}`;
+const best=xs=>xs.reduce((a,x)=>!a||x.w>a.w||(x.w===a.w&&x.r>a.r)?x:a,null);
+const better=(a,b)=>a.w>b.w||(a.w===b.w&&a.r>b.r);
 // --- session bar ---
 let barTimer;
 function renderSessBar(){const b=$('#sessBar');clearInterval(barTimer);
@@ -23,13 +28,13 @@ async function endSession(){if(!session)return;
   const s=session;s.end=Date.now();sessions.push(s);session=null;await saveSessions();await saveActive();stopRest();renderSessBar();showSessionReport(s.id)}
 // --- logging sets ---
 function openLog(id){const m=machines.find(x=>x.id===id);if(!m)return;
-  const mine=session.sets.filter(x=>x.mid===id),last=mine[mine.length-1];let w=last?last.w:m.weight,r=last?last.r:10;const st=m.step||2.5;
+  const mine=session.sets.filter(x=>x.mid===id),last=mine[mine.length-1];let w=last?last.w:m.weight,r=last?last.r:(m.bw&&m.reps?m.reps:10);const st=m.step||2.5;
   const prev=[...sessions].reverse().find(s=>s.sets.some(x=>x.mid===id));
   openSheet(`<div class="row between"><h2>${esc(m.name)}</h2><button class="link" id="lEdit">⚙️ משקל קבוע</button></div>
-  <ol class="sets">${mine.map((x,i)=>`<li><span>סט ${i+1}</span><b>${fmt(x.w)} ק״ג × ${x.r}</b><button class="link" data-ds="${session.sets.indexOf(x)}" style="color:#f87171">✕</button></li>`).join('')||'<li class="muted">עוד לא נרשמו סטים בתרגיל הזה</li>'}</ol>
-  ${prev?`<div class="muted small">באימון הקודם (${fdate(prev.start)}): ${prev.sets.filter(x=>x.mid===id).map(x=>`${fmt(x.w)}×${x.r}`).join(', ')}</div>`:''}
+  <ol class="sets">${mine.map((x,i)=>`<li><span>סט ${i+1}</span><b>${isBW(id)?bwTxt(x.w,x.r):`${fmt(x.w)} ק״ג × ${x.r}`}</b><button class="link" data-ds="${session.sets.indexOf(x)}" style="color:#f87171">✕</button></li>`).join('')||'<li class="muted">עוד לא נרשמו סטים בתרגיל הזה</li>'}</ol>
+  ${prev?`<div class="muted small">באימון הקודם (${fdate(prev.start)}): ${prev.sets.filter(x=>x.mid===id).map(setTxt).join(', ')}</div>`:''}
   <h3 class="sec">סט ${mine.length+1}</h3>
-  <label>משקל (ק״ג)</label><div class="row"><button class="pm" id="wM">−</button><div class="val" id="wV"></div><button class="pm" id="wP">+</button></div>
+  <label>${m.bw?'משקל נוסף (ק״ג) · 0 = משקל גוף':'משקל (ק״ג)'}</label><div class="row"><button class="pm" id="wM">−</button><div class="val" id="wV"></div><button class="pm" id="wP">+</button></div>
   <label>חזרות</label><div class="row"><button class="pm" id="rM">−</button><div class="val" id="rV"></div><button class="pm" id="rP">+</button></div>
   <button class="btn pri big" id="lDone">✔ בוצע</button><button class="btn" id="lClose">סגור</button>`);
   const upd=()=>{$('#wV').textContent=fmt(w);$('#rV').textContent=r};upd();
@@ -68,34 +73,36 @@ function agg(list){const ex={},grp={};let v=0,t=0,n=0;
     for(const k in ex)if(ex[k]._s===s.id&&ex[k]._first===undefined)ex[k]._first=s.id;
   }
   // firstMax = max of first session containing exercise
-  for(const k in ex){const ss=list.filter(s=>s.sets.some(x=>x.mid===k));const ssP=ss.filter(s=>s.sets.some(x=>x.mid===k&&x.w>0));const mx=s=>Math.max(...s.sets.filter(x=>x.mid===k).map(x=>x.w));ex[k].firstMax=ssP.length?mx(ssP[0]):0;ex[k].lastMax=ssP.length?mx(ssP[ssP.length-1]):0}
+  for(const k in ex){const ss=list.filter(s=>s.sets.some(x=>x.mid===k));const ssP=ss.filter(s=>s.sets.some(x=>x.mid===k&&x.w>0));const mx=s=>Math.max(...s.sets.filter(x=>x.mid===k).map(x=>x.w));ex[k].firstMax=ssP.length?mx(ssP[0]):0;ex[k].lastMax=ssP.length?mx(ssP[ssP.length-1]):0;
+    if(isBW(k)&&ss.length){const bs=s=>best(s.sets.filter(x=>x.mid===k));ex[k].bw=true;ex[k].fb=bs(ss[0]);ex[k].lb=bs(ss[ss.length-1])}}
   return{count:list.length,time:t,vol:v,sets:n,grp,ex}}
 function prsOf(s){const out=[];const ids=[...new Set(s.sets.map(x=>x.mid))];
-  for(const id of ids){const mx=Math.max(...s.sets.filter(x=>x.mid===id).map(x=>x.w));
+  for(const id of ids){if(isBW(id)){const b=best(s.sets.filter(x=>x.mid===id)),pb=best(sessions.filter(o=>o.id!==s.id&&o.start<s.start).flatMap(o=>o.sets.filter(x=>x.mid===id)));if(pb&&better(b,pb))out.push({id,name:mName(b),w:b.w,prev:pb.w,txt:bwTxt(b.w,b.r),ptxt:bwTxt(pb.w,pb.r)});continue}
+    const mx=Math.max(...s.sets.filter(x=>x.mid===id).map(x=>x.w));
     const before=sessions.filter(o=>o.id!==s.id&&o.start<s.start).flatMap(o=>o.sets.filter(x=>x.mid===id&&x.w>0).map(x=>x.w));
     if(before.length&&mx>Math.max(...before))out.push({id,name:mName(s.sets.find(x=>x.mid===id)),w:mx,prev:Math.max(...before)})}
   return out}
 function sessionText(s){const a=agg([s]),pr=prsOf(s);let t=`🏋️ אימון ${fdate(s.start)} ${hm(s.start)}\n⏱️ ${durTxt(s.end-s.start)} · ${a.sets} סטים · נפח ${nf(a.vol)} ק״ג\n`;
   const byG={};for(const x of s.sets)(byG[mGroup(x)]=byG[mGroup(x)]||[]).push(x);
-  for(const g in byG){t+=`\n*${g}*\n`;const byM={};for(const x of byG[g])(byM[x.mid]=byM[x.mid]||[]).push(x);for(const k in byM)t+=`• ${mName(byM[k][0])}: ${byM[k].map(x=>`${fmt(x.w)}×${x.r}`).join(', ')}\n`}
-  if(pr.length)t+=`\n🏆 שיאים: ${pr.map(p=>`${p.name} ${fmt(p.w)} ק״ג`).join(', ')}\n`;return t}
+  for(const g in byG){t+=`\n*${g}*\n`;const byM={};for(const x of byG[g])(byM[x.mid]=byM[x.mid]||[]).push(x);for(const k in byM)t+=`• ${mName(byM[k][0])}: ${byM[k].map(setTxt).join(', ')}\n`}
+  if(pr.length)t+=`\n🏆 שיאים: ${pr.map(p=>`${p.name} ${p.txt||fmt(p.w)+' ק״ג'}`).join(', ')}\n`;return t}
 function sessionHTML(s){const a=agg([s]),pr=prsOf(s);const byG={};for(const x of s.sets)(byG[mGroup(x)]=byG[mGroup(x)]||[]).push(x);
   return `<div class="stats3"><div class="stat"><div class="st">משך</div><div class="sv2">${durTxt(s.end-s.start)}</div></div><div class="stat"><div class="st">סטים</div><div class="sv2">${a.sets}</div></div><div class="stat"><div class="st">נפח (ק״ג)</div><div class="sv2">${nf(a.vol)}</div></div></div>
-  ${pr.length?`<div class="pr">🏆 שיאים אישיים: ${pr.map(p=>`<div><b>${esc(p.name)}</b> ${fmt(p.w)} ק״ג <small>(קודם ${fmt(p.prev)})</small></div>`).join('')}</div>`:''}
-  ${Object.keys(byG).map(g=>{const byM={};for(const x of byG[g])(byM[x.mid]=byM[x.mid]||[]).push(x);return `<h3 class="sec">${esc(g)} <small class="muted">${nf(vol(byG[g]))} ק״ג</small></h3>`+Object.values(byM).map(xs=>`<div class="exr"><b>${esc(mName(xs[0]))}</b><div>${xs.map(x=>`<span class="pill">${fmt(x.w)}×${x.r}</span>`).join('')}</div><small class="muted">נפח ${nf(vol(xs))} ק״ג</small></div>`).join('')}).join('')}`}
+  ${pr.length?`<div class="pr">🏆 שיאים אישיים: ${pr.map(p=>`<div><b>${esc(p.name)}</b> ${p.txt||fmt(p.w)+' ק״ג'} <small>(קודם ${p.ptxt||fmt(p.prev)})</small></div>`).join('')}</div>`:''}
+  ${Object.keys(byG).map(g=>{const byM={};for(const x of byG[g])(byM[x.mid]=byM[x.mid]||[]).push(x);return `<h3 class="sec">${esc(g)} <small class="muted">${nf(vol(byG[g]))} ק״ג</small></h3>`+Object.values(byM).map(xs=>`<div class="exr"><b>${esc(mName(xs[0]))}</b><div>${xs.map(x=>`<span class="pill">${setTxt(x)}</span>`).join('')}</div><small class="muted">${isBW(xs[0].mid)?`סה״כ ${xs.reduce((a,x)=>a+x.r,0)} חזרות`:`נפח ${nf(vol(xs))} ק״ג`}</small></div>`).join('')}).join('')}`}
 function showSessionReport(id){const s=sessions.find(x=>x.id===id);if(!s)return;
-  const heavy={};for(const x of s.sets)heavy[x.mid]=Math.max(heavy[x.mid]||0,x.w);
-  const upd=Object.keys(heavy).map(k=>({m:machines.find(y=>y.id===k),w:heavy[k]})).filter(o=>o.m&&o.m.weight!==o.w);
+  const heavy={};for(const x of s.sets){const h=heavy[x.mid];if(!h||better(x,h))heavy[x.mid]=x}
+  const upd=Object.keys(heavy).map(k=>({m:machines.find(y=>y.id===k),w:heavy[k].w,r:heavy[k].r})).filter(o=>o.m&&(o.m.weight!==o.w||(o.m.bw&&o.m.reps!==o.r)));
   openSheet(`<h2>📋 דוח אימון · ${fdate(s.start)} ${hm(s.start)}</h2>${sessionHTML(s)}
   ${upd.length?`<button class="btn pri" id="srUpd">⬆️ עדכן משקל נוכחי לסט הכבד (${upd.length})</button>`:''}
   <button class="btn" id="srShare">📤 שתף</button><button class="btn danger" id="srDel">🗑️ מחק אימון</button><button class="btn" id="srX">סגור</button>`);
   $('#srX').onclick=closeSheet;$('#srShare').onclick=()=>share(sessionText(s));
-  if(upd.length)$('#srUpd').onclick=async()=>{if(!confirm('לעדכן:\n'+upd.map(o=>`${o.m.name}: ${fmt(o.m.weight)} ← ${fmt(o.w)} ק״ג`).join('\n')))return;
-    const before=upd.map(o=>structuredClone(o.m));const now=Date.now();for(const o of upd){o.m.weight=o.w;o.m.updated=now;o.m.history.push({t:now,w:o.w});await put(o.m)}await load();showSessionReport(id);
+  if(upd.length)$('#srUpd').onclick=async()=>{if(!confirm(('לעדכן:\n'+upd.map(o=>o.m.bw?`${o.m.name}: ${o.m.reps==null?'—':bwTxt(o.m.weight,o.m.reps)} ← ${bwTxt(o.w,o.r)}`:`${o.m.name}: ${fmt(o.m.weight)} ← ${fmt(o.w)} ק״ג`).join('\n')).replace(/<[^>]+>/g,'')))return;
+    const before=upd.map(o=>structuredClone(o.m));const now=Date.now();for(const o of upd){o.m.weight=o.w;o.m.updated=now;if(o.m.bw){o.m.reps=o.r;o.m.history.push({t:now,w:o.w,r:o.r})}else o.m.history.push({t:now,w:o.w});await put(o.m)}await load();showSessionReport(id);
     toast(`עודכנו ${upd.length} תרגילים`,async()=>{for(const m of before)await put(m);await load();if(!$('#sheet').hidden)showSessionReport(id)})};
   $('#srDel').onclick=async()=>{if(!confirm(`למחוק את האימון מ-${fdate(s.start)}? אי אפשר לבטל.`))return;sessions=sessions.filter(x=>x!==s);await saveSessions();closeSheet();if(view==='reports')renderReports()}}
 // --- share ---
-async function share(text){if(navigator.share){try{await navigator.share({text});return}catch(e){if(e.name==='AbortError')return}}
+async function share(text){text=text.replace(/<[^>]+>/g,'');if(navigator.share){try{await navigator.share({text});return}catch(e){if(e.name==='AbortError')return}}
   try{await navigator.clipboard.writeText(text);toast('הדוח הועתק — אפשר להדביק בווטסאפ',null)}catch{openSheet(`<h2>העתק את הדוח</h2><textarea class="ta" readonly>${esc(text)}</textarea><button class="btn" onclick="closeSheet()">סגור</button>`);$('.ta').select()}}
 // --- period reports ---
 function period(type,off){const n=new Date();let a,b;
@@ -110,8 +117,11 @@ function periodData(){const p=period(rp.type,rp.off),q=period(rp.type,rp.off-1);
 function periodText(){const{p,A,B}=periodData();const nm=rp.type==='week'?'שבועי':'חודשי';
   let t=`📊 דוח ${nm} · ${pLabel(rp.type,p)}\n🏋️ ${A.count} אימונים (קודם ${B.count})\n⏱️ ${durTxt(A.time)}\n💪 נפח ${nf(A.vol)} ק״ג${pctTxt(A.vol,B.vol)}\n`;
   if(Object.keys(A.grp).length){t+='\n*נפח לפי אזור*\n';for(const g in A.grp)t+=`• ${g}: ${nf(A.grp[g])} ק״ג${pctTxt(A.grp[g],B.grp[g]||0)}\n`}
-  if(Object.keys(A.ex).length){t+='\n*תרגילים*\n';for(const e of Object.values(A.ex))t+=`• ${e.name}: ${fmt(e.firstMax)}→${fmt(e.lastMax)} ק״ג, נפח ${nf(e.vol)}\n`}
+  if(Object.keys(A.ex).length){t+='\n*תרגילים*\n';for(const e of Object.values(A.ex))t+=e.bw?`• ${e.name}: ${bwTxt(e.fb.w,e.fb.r)} → ${bwTxt(e.lb.w,e.lb.r)}\n`:`• ${e.name}: ${fmt(e.firstMax)}→${fmt(e.lastMax)} ק״ג, נפח ${nf(e.vol)}\n`}
   const bw=bodyChg(p,'w'),bf=bodyChg(p,'f');if(bw||bf)t+=`\n⚖️ ${bw?`משקל ${fmt(bw.a)}→${fmt(bw.b)} ק״ג`:''}${bw&&bf?' · ':''}${bf?`שומן ${fmt(bf.a)}→${fmt(bf.b)}%`:''}\n`;return t}
+function exLi(e){const d=e.lastMax-e.firstMax;
+  const right=e.bw?`${bwTxt(e.fb.w,e.fb.r)} → ${bwTxt(e.lb.w,e.lb.r)}`:`<bdi dir="ltr">${fmt(e.firstMax)}→${fmt(e.lastMax)}</bdi> ק״ג ${d?`<small class="${d>0?'up2':'down2'}">(${d>0?'+':'−'}${fmt(Math.abs(d))})</small>`:''}`;
+  return `<li><span>${esc(e.name)}<br><small class="muted">${e.sets} סטים${e.bw?` · ${e.reps} חזרות`:` · נפח ${nf(e.vol)}`}</small></span><span>${right}</span></li>`}
 function renderReports(){const{p,A,B,list}=periodData();const el=$('#repView');
   const grps=[...new Set([...Object.keys(A.grp),...Object.keys(B.grp)])];
   const bw=bodyChg(p,'w'),bf=bodyChg(p,'f');
@@ -122,7 +132,7 @@ function renderReports(){const{p,A,B,list}=periodData();const el=$('#repView');
   <div class="stat"><div class="st">נפח (ק״ג)</div><div class="sv2 sm">${nf(A.vol)}</div>${dTxt(A.vol,B.vol)}</div></div>
   <div class="muted small" style="text-align:center">בהשוואה ל${rp.type==='week'?'שבוע':'חודש'} הקודם</div>
   ${grps.length?`<h3 class="sec">נפח לפי אזור</h3><ul class="hist">${grps.map(g=>`<li><span>${esc(g)}</span><span>${nf(A.grp[g]||0)} ${dTxt(A.grp[g]||0,B.grp[g]||0)}</span></li>`).join('')}</ul>`:''}
-  ${Object.keys(A.ex).length?`<h3 class="sec">תרגילים</h3><ul class="hist">${Object.values(A.ex).map(e=>{const d=e.lastMax-e.firstMax;return `<li><span>${esc(e.name)}<br><small class="muted">${e.sets} סטים · נפח ${nf(e.vol)}</small></span><span><bdi dir="ltr">${fmt(e.firstMax)}→${fmt(e.lastMax)}</bdi> ק״ג ${d?`<small class="${d>0?'up2':'down2'}">(${d>0?'+':'−'}${fmt(Math.abs(d))})</small>`:''}</span></li>`}).join('')}</ul>`:''}
+  ${Object.keys(A.ex).length?`<h3 class="sec">תרגילים</h3><ul class="hist">${Object.values(A.ex).map(exLi).join('')}</ul>`:''}
   ${bw||bf?`<h3 class="sec">הגוף שלי בתקופה</h3><ul class="hist">${bw?`<li><span>משקל</span><span><bdi dir="ltr">${fmt(bw.a)}→${fmt(bw.b)}</bdi> ק״ג ${chg(bw.b-bw.a,' ק״ג',0)}</span></li>`:''}${bf?`<li><span>אחוז שומן</span><span><bdi dir="ltr">${fmt(bf.a)}→${fmt(bf.b)}%</bdi> ${chg(bf.b-bf.a,'%',0)}</span></li>`:''}</ul>`:''}
   <button class="btn" id="pShare">📤 שתף דוח</button>
   <h3 class="sec">היסטוריית אימונים</h3>${sessions.length?`<ul class="hist">${[...sessions].sort((x,y)=>y.start-x.start).map(s=>`<li class="click" data-sid="${s.id}"><span>${fdate(s.start)} ${hm(s.start)}<br><small class="muted">${[...new Set(s.sets.map(mGroup))].join(', ')}</small></span><span>${durTxt(s.end-s.start)} · ${s.sets.length} סטים ›</span></li>`).join('')}</ul>`:'<p class="sec-empty">עוד אין אימונים. לחץ "התחל אימון" במסך התרגילים.</p>'}`;
