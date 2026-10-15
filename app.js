@@ -15,7 +15,8 @@ const gName=id=>(groups.find(g=>g.id===id)||{name:'ללא קטגוריה'}).name
 const newId=()=>crypto.randomUUID?crypto.randomUUID():Date.now()+''+Math.random();
 async function loadGroups(){groups=await metaGet('groups');if(!groups){groups=DEF.map((n,i)=>({id:'g'+(i+1),name:n}));await metaPut('groups',groups)}}
 const saveGroups=()=>metaPut('groups',groups);
-async function load(){machines=(await all()).sort((a,b)=>a.created-b.created);for(const m of machines)if(!m.group||!groups.some(g=>g.id===m.group))m.group=NONE;render()}
+async function load(){machines=(await all()).sort((a,b)=>a.created-b.created);for(const m of machines)if(!m.group||!groups.some(g=>g.id===m.group))m.group=NONE;
+  for(const m of machines){const L=m.lib&&typeof LIBRARY!=='undefined'&&LIBRARY.find(e=>e.key===m.lib);if(L&&typeof m.photo==='string'&&m.photo.startsWith('img/')&&m.photo!==L.img){m.photo=L.img;await put(m)}}render()}
 const sgn=n=>(n>0?'+':n<0?'−':'')+fmt(Math.abs(n));
 const fromStart=m=>{const s0=m.history[0]?m.history[0].w:m.weight,d=m.weight-s0;if(!d)return'';const pc=s0?` (${sgn(d/s0*100).replace(/(\.\d)\d+/,'$1')}%)`:'';return `<span style="color:${d>0?'#4ade80':'#f87171'}"><bdi dir="ltr">${sgn(d)}</bdi> ק״ג מההתחלה <bdi dir="ltr">${pc.trim()}</bdi></span>`};
 const card=m=>`<button class="card" data-id="${m.id}">${m.photo?`<img src="${m.photo}" alt="">`:'<div class="ph">🏋️</div>'}
