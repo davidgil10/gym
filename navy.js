@@ -33,5 +33,6 @@ function openNavy(){const sex0=localStorage.getItem('navySex')||'m',h0=localStor
   ['nH','nN','nW','nP'].forEach(id=>$('#'+id).oninput=calc);calc();
   $('#nX').onclick=closeSheet;
   $('#nSave').onclick=async()=>{const r=calc();if(!r)return;localStorage.setItem('navyH',r.m.h);const kg=num('nKg');const w=kg>0&&kg<500?Math.round(kg*10)/10:null;
-    const before=structuredClone(body);body.push({id:newId(),date:today(),w,f:r.bf,m:r.m,t:Date.now()});await saveBody();closeSheet();renderBody();
+    const dup=body.find(x=>x.date===today());if(dup&&!confirm(`כבר יש רישום היום (${[dup.w!=null?fmt(dup.w)+' ק״ג':'',dup.f!=null?fmt(dup.f)+'%':''].filter(Boolean).join(' · ')}).\nלהחליף אותו?`))return;
+    const before=structuredClone(body);if(dup)Object.assign(dup,{w:w!=null?w:dup.w,f:r.bf,m:r.m,t:Date.now()});else body.push({id:newId(),date:today(),w,f:r.bf,m:r.m,t:Date.now()});await saveBody();closeSheet();renderBody();
     toast(`נשמר ביומן: ${fmt(r.bf)}% שומן`,async()=>{body=before;await saveBody();renderBody()})}}

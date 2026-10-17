@@ -75,7 +75,7 @@ function openForm(m){const st={photo:m?m.photo:null};
     await put({id:newId(),name,group,...(tm?{timed:true,secs:null}:bw?{bw:true,reps:null}:{}),photo:st.photo,weight:w,step:2.5,created:now,updated:now,history:(w>0&&!bw&&!tm)?[{t:now,w}]:[]});closeSheet();load()};
   if(m)$('#fDel').onclick=async()=>{if(confirm(`למחוק את "${m.name}" כולל כל ההיסטוריה? אי אפשר לבטל.`)){await del(m.id);closeSheet();load()}}}
 
-function openEditBW(m){let r=m.reps==null?8:m.reps,w=m.weight||0,step=m.step||2.5;const hist=[...m.history].reverse();
+function openEditBW(m){let r=m.reps==null||m.reps<1?8:m.reps,w=m.weight||0,step=m.step||2.5;const hist=[...m.history].reverse();
   openSheet(`<div class="row between"><h2>${esc(m.name)} <small class="gtag">${esc(gName(m.group))}</small></h2><button class="link" id="eDet">✏️ עריכה</button></div>
   <label>חזרות</label><div class="row"><button class="pm" id="rM">−</button><div class="val" id="rV"></div><button class="pm" id="rP">+</button></div>
   <label>משקל נוסף (ק״ג) · 0 = משקל גוף</label><div class="row"><button class="pm" id="wM">−</button><div class="val" id="wV"></div><button class="pm" id="wP">+</button></div>
@@ -86,7 +86,7 @@ function openEditBW(m){let r=m.reps==null?8:m.reps,w=m.weight||0,step=m.step||2.
   const upd=()=>{$('#rV').textContent=r;$('#wV').textContent=w>0?'+'+fmt(w):'0';const ch=r!==m.reps||w!==(m.weight||0);$('#eSave').disabled=!ch;$('#eD').textContent=ch?'לחץ "שמור" כדי לעדכן':'';
     document.querySelectorAll('.steps button').forEach(b=>b.classList.toggle('on',+b.dataset.s===step))};upd();
   document.querySelectorAll('.steps button').forEach(b=>b.onclick=()=>{step=+b.dataset.s;upd()});
-  $('#rP').onclick=()=>{r++;upd()};$('#rM').onclick=()=>{r=Math.max(0,r-1);upd()};
+  $('#rP').onclick=()=>{r++;upd()};$('#rM').onclick=()=>{r=Math.max(1,r-1);upd()};
   $('#wP').onclick=()=>{w=Math.round((w+step)*100)/100;upd()};$('#wM').onclick=()=>{w=Math.max(0,Math.round((w-step)*100)/100);upd()};
   $('#eCancel').onclick=closeSheet;$('#eDet').onclick=()=>openForm(m);
   $('#eSave').onclick=async()=>{const before=structuredClone(m);const now=Date.now();m.reps=r;m.weight=w;m.step=step;m.updated=now;m.history.push({t:now,w,r});await put(m);closeSheet();await load();
@@ -116,9 +116,9 @@ let tt;function toast(msg,undo){$('#toastMsg').textContent=msg;$('#toast').hidde
   $('#undoBtn').onclick=async()=>{$('#toast').hidden=true;await undo()};tt=setTimeout(()=>$('#toast').hidden=true,6000)}
 // menu: backup
 $('#menuBtn').onclick=()=>{openSheet(`<h2>גיבוי</h2><p style="opacity:.8;font-size:14px">הנתונים שמורים רק בטלפון הזה. מומלץ לייצא גיבוי מדי פעם.</p>
-  <button class="btn" id="mLib">📚 שחזר תרגילים מובנים</button><button class="btn" id="mExp">⬇️ ייצוא גיבוי (JSON)</button><button class="btn" id="mImp">⬆️ ייבוא גיבוי</button><button class="btn" id="mClose">סגור</button><p class="ver">גרסה ${typeof APP_VERSION!=='undefined'?APP_VERSION:'?'}</p>`);
+  <p class="ver" id="mLast" style="margin:0 0 8px;opacity:.8">${backupTxt(lastBackup)}</p><button class="btn" id="mLib">📚 שחזר תרגילים מובנים</button><button class="btn" id="mExp">⬇️ ייצוא גיבוי (JSON)</button><button class="btn" id="mImp">⬆️ ייבוא גיבוי</button><button class="btn" id="mClose">סגור</button><p class="ver">גרסה ${typeof APP_VERSION!=='undefined'?APP_VERSION:'?'}</p>`);
   $('#mClose').onclick=closeSheet;$('#mLib').onclick=async()=>{const n=await addLibrary();closeSheet();toast(n?`נוספו ${n} תרגילים מובנים`:'כל התרגילים המובנים כבר קיימים',null)};
-  $('#mExp').onclick=()=>{const b=new Blob([JSON.stringify({app:'gym-weights',v:2,exported:Date.now(),groups,machines,body,sessions},null,1)],{type:'application/json'});
+  $('#mExp').onclick=async()=>{await metaPut('lastBackup',Date.now());renderNudge();$('#mLast').textContent=backupTxt(Date.now());const b=new Blob([JSON.stringify({app:'gym-weights',v:2,exported:Date.now(),groups,machines,body,sessions},null,1)],{type:'application/json'});
     const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`gym-backup-${new Date().toISOString().slice(0,10)}.json`;a.click()};
   $('#mImp').onclick=()=>$('#importFile').click()};
 $('#importFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text());const list=d.machines||d;if(!Array.isArray(list))throw 0;
@@ -178,7 +178,8 @@ function openBody(e){const last=sorted().slice(-1)[0]||{};
   $('#bCancel').onclick=closeSheet;
   $('#bSave').onclick=async()=>{const num=id=>{const v=$('#'+id).value.trim();return v===''?null:r1(parseFloat(v))};const w=num('bW'),f=num('bF'),date=$('#bD').value||today();
     if(w==null&&f==null)return alert('צריך למלא משקל או אחוז שומן');if((w!=null&&!(w>0&&w<500))||(f!=null&&!(f>0&&f<80)))return alert('ערך לא תקין');
-    const before=structuredClone(body);if(e)Object.assign(e,{date,w,f});else body.push({id:newId(),date,w,f,t:Date.now()});
+    const dup=!e&&body.find(x=>x.date===date);if(dup&&!confirm(`כבר יש רישום ב-${fd(date)} (${[dup.w!=null?fmt(dup.w)+' ק״ג':'',dup.f!=null?fmt(dup.f)+'%':''].filter(Boolean).join(' · ')}).\nלהחליף אותו ברישום החדש?`))return;
+    const before=structuredClone(body);if(e)Object.assign(e,{date,w,f});else if(dup){Object.assign(dup,{w,f,t:Date.now()});delete dup.m}else body.push({id:newId(),date,w,f,t:Date.now()});
     await saveBody();await saveSessions();closeSheet();renderBody();toast(e?'הרישום עודכן':'הרישום נשמר',async()=>{body=before;await saveBody();renderBody()})};
   if(e)$('#bDel').onclick=async()=>{if(!confirm(`למחוק את הרישום מ-${fd(e.date)}?`))return;const before=structuredClone(body);body=body.filter(x=>x!==e);await saveBody();await saveSessions();closeSheet();renderBody();toast('הרישום נמחק',async()=>{body=before;await saveBody();renderBody()})}}
 function setView(v){view=v;document.querySelectorAll('.vt').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
@@ -186,7 +187,17 @@ function setView(v){view=v;document.querySelectorAll('.vt').forEach(b=>b.classLi
 document.querySelectorAll('.vt').forEach(b=>b.onclick=()=>setView(b.dataset.v));
 $('#addBtn').onclick=()=>view==='body'?openBody(null):openForm(null);
 $('#rM15').onclick=()=>adjRest(-15);$('#rP15').onclick=()=>adjRest(15);$('#rSkip').onclick=stopRest;$('#restSet').onclick=restPresets;
-openDB().then(loadGroups).then(async()=>{body=(await metaGet('body'))||[];sessions=(await metaGet('sessions'))||[];session=(await metaGet('active'))||null;renderSessBar();renderRest()}).then(load).then(()=>setView('machines')).then(libInit).then(resumeTimer);
+openDB().then(loadGroups).then(async()=>{body=(await metaGet('body'))||[];sessions=(await metaGet('sessions'))||[];session=(await metaGet('active'))||null;renderSessBar();renderRest()}).then(load).then(()=>setView('machines')).then(libInit).then(resumeTimer).then(persistStorage).then(renderNudge).then(()=>checkStale());
+// ===== storage persistence + backup reminder =====
+let lastBackup=null;
+const backupTxt=t=>{if(!t)return'💾 גיבוי אחרון: עוד לא בוצע';const d=Math.floor((Date.now()-t)/864e5);return '💾 גיבוי אחרון: '+(d<1?'היום':d===1?'אתמול':`לפני ${d} ימים`)};
+const hasData=()=>machines.some(m=>m.history&&m.history.length)||sessions.length||body.length;
+async function renderNudge(){lastBackup=(await metaGet('lastBackup'))||null;const dis=(await metaGet('nudgeDismissed'))||0,b=$('#nudge');
+  const old=!lastBackup||Date.now()-lastBackup>14*864e5,snoozed=Date.now()-dis<7*864e5;
+  if(!old||snoozed||!hasData()){b.hidden=true;return}
+  b.hidden=false;b.querySelector('span').textContent=lastBackup?`לא גיבית כבר ${Math.floor((Date.now()-lastBackup)/864e5)} ימים`:'עוד לא גיבית את הנתונים';
+  b.querySelector('#ndGo').onclick=()=>$('#menuBtn').click();b.querySelector('#ndX').onclick=async()=>{await metaPut('nudgeDismissed',Date.now());b.hidden=true}}
+async function persistStorage(){try{if(navigator.storage&&navigator.storage.persist&&!(await navigator.storage.persisted()))await navigator.storage.persist()}catch(e){}}
 // ===== updates =====
 if('serviceWorker' in navigator){let clicked=false,reloaded=false;
   const showUpd=w=>{const b=$('#updBar');b.hidden=false;b.onclick=()=>{clicked=true;b.textContent='מעדכן…';w.postMessage({type:'SKIP_WAITING'})}};
