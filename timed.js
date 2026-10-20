@@ -8,7 +8,7 @@ function wakeOff(){try{wakeLock&&wakeLock.release()}catch(e){}wakeLock=null}
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&swGet())wakeOn()});
 async function recordTime(m,d){if(!(d>=1))return;const before=structuredClone(m),sBefore=session?structuredClone(session.sets):null,now=Date.now();
   m.secs=d;m.updated=now;m.history.push({t:now,s:d});await put(m);
-  if(session){session.sets.push({mid:m.id,name:m.name,gname:gName(m.group),w:0,r:0,s:d,t:now});await saveActive();renderSessBar()}
+  if(session){{const pv=session.sets[session.sets.length-1],x={mid:m.id,name:m.name,gname:gName(m.group),w:0,r:0,s:d,t:now};if(pv)x.rest=Math.max(0,Math.round((now-d*1000-pv.t)/1000));session.sets.push(x)}await saveActive();renderSessBar()}
   await load();openTimed(machines.find(x=>x.id===m.id));if(session)startRest();
   toast(`${m.name}: ${mmss(d)} נשמר`,async()=>{await put(before);if(sBefore&&session){session.sets=sBefore;await saveActive();renderSessBar()}await load();if(!$('#sheet').hidden&&$('#tV'))openTimed(machines.find(x=>x.id===m.id))})}
 function openTimed(m){if(!m)return;clearInterval(swTick);const hist=[...m.history].reverse(),mine=session?session.sets.filter(x=>x.mid===m.id):[];
@@ -22,7 +22,7 @@ function openTimed(m){if(!m)return;clearInterval(swTick);const hist=[...m.histor
   <h2 style="margin-top:20px">התקדמות</h2><div class="delta">${fromStartT(m)}</div>${chart(m.history.map(h=>({t:h.t,w:h.s})))}
   <ul class="hist">${hist.map((x,i)=>{const p=hist[i+1],d=p?x.s-p.s:0;return `<li><span>${fdate(x.t)}</span><span><bdi dir="ltr">${mmss(x.s)}</bdi> ${d?`<small style="color:${d>0?'#22c55e':'#f87171'}">(${d>0?'+':'−'}${mmss(Math.abs(d))})</small>`:''}</span></li>`}).join('')}</ul>`);
   $('#tCD').onchange=e=>localStorage.setItem('cd321',e.target.checked?'1':'0');
-  $('#tClose').onclick=closeSheet;$('#eDet').onclick=()=>{if(swGet())return alert('קודם עצור את הסטופר');openForm(m)};
+  $('#tClose').onclick=()=>{if(swGet())return closeSheet();finishExercise(m.id)};$('#eDet').onclick=()=>{if(swGet())return alert('קודם עצור את הסטופר');openForm(m)};
   $('#tMan').onclick=()=>{const d=parseTime(prompt('זמן (דק:שנ, למשל 1:30):','')); if(d==null||d<1)return;recordTime(m,d)};
   if(session)$('#sheet').querySelectorAll('[data-ds]').forEach(b=>b.onclick=async()=>{if(!confirm('למחוק את הסט?'))return;session.sets.splice(+b.dataset.ds,1);await saveActive();renderSessBar();openTimed(m)});
   const paint=()=>{const r=swGet(),el=$('#tV');if(!el)return clearInterval(swTick);const go=$('#tGo');

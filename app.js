@@ -44,7 +44,7 @@ function render(){
   const tabs=[{id:'all',name:'הכל'},...groups,...(hasNone?[{id:NONE,name:'ללא קטגוריה'}]:[])];
   $('#chips').innerHTML=tabs.map(t=>{const n=t.id==='all'?machines.length:machines.filter(m=>m.group===t.id).length;return `<button class="chip${t.id===filter?' on':''}" data-g="${t.id}">${esc(t.name)} <small>${n}</small></button>`}).join('')+'<button class="chip" id="mgGroups">⚙️ קבוצות</button>';
   $('#empty').hidden=machines.length>0||view!=='machines';
-  if(filter==='all'){$('#grid').innerHTML=(typeof planHTML=='function'?planHTML():'')+[...groups,{id:NONE,name:'ללא קטגוריה'}].map(g=>{const ms=machines.filter(m=>m.group===g.id);return ms.length?`<h3 class="sec">${esc(g.name)}</h3>`+ms.map(card).join(''):''}).join('')}
+  if(filter==='all'){$('#grid').innerHTML=(typeof planHTML=='function'?planHTML():'')+[...(typeof groupsByNeglect=='function'?groupsByNeglect():groups),{id:NONE,name:'ללא קטגוריה'}].map(g=>{const ms=machines.filter(m=>m.group===g.id);return ms.length?`<h3 class="sec">${esc(g.name)}</h3>`+ms.map(card).join(''):''}).join('')}
   else{const ms=machines.filter(m=>m.group===filter);$('#grid').innerHTML=ms.length?ms.map(card).join(''):'<p class="sec-empty">אין עדיין תרגילים בקבוצה הזו</p>'}
   if(typeof markPlan=='function'){markPlan();renderToday()}
 }
