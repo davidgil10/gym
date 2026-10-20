@@ -17,7 +17,7 @@ function renderToday(){const el=$('#today');if(!el)return;
   if(view!=='machines'||session){el.hidden=true;return}el.hidden=false;
   const A=areaStats();
   if(!A.length){el.innerHTML='<div class="tdh"><b>🎯 מה לאמן היום</b></div><p class="tdm">הוסף תרגילים כדי לקבל המלצה 💪</p>';return}
-  let cur=A.find(a=>a.g.id===todayPick)||A[0];const ex=pickExercises(cur);const open=localStorage.todayOpen!=='0';
+  let cur=A.find(a=>a.g.id===todayPick)||A[0];const ex=pickExercises(cur);const small=innerWidth<=360||innerHeight<=640;const open=localStorage.todayOpen!=null?localStorage.todayOpen!=='0':!small;
   const none=!sessions.length;
   el.innerHTML=`<div class="tdh"><button class="tdt" id="tdTog" aria-expanded="${open}"><b>🎯 מה לאמן היום:</b> <span>${esc(cur.g.name)}</span> <small class="tdb ${agoCls(cur.days)}">${agoTxt(cur.days)}</small> <span class="tdc">${open?'▴':'▾'}</span></button></div>
   ${open?`${none?'<p class="tdm">עוד אין אימונים רשומים – הנה הצעה להתחלה 🙂</p>':''}

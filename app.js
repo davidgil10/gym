@@ -122,12 +122,7 @@ $('#menuBtn').onclick=()=>{openSheet(`<h2>גיבוי</h2><p style="opacity:.8;fo
   $('#mExp').onclick=async()=>{await metaPut('lastBackup',Date.now());renderNudge();$('#mLast').textContent=backupTxt(Date.now());const b=new Blob([JSON.stringify({app:'gym-weights',v:2,exported:Date.now(),groups,machines,body,sessions},null,1)],{type:'application/json'});
     const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`gym-backup-${new Date().toISOString().slice(0,10)}.json`;a.click()};
   $('#mImp').onclick=()=>$('#importFile').click()};
-$('#importFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text());const list=d.machines||d;if(!Array.isArray(list))throw 0;
-  if(Array.isArray(d.sessions))for(const x of d.sessions){if(x&&x.id&&x.start&&Array.isArray(x.sets)&&!sessions.some(y=>y.id===x.id))sessions.push(x)}
-  if(Array.isArray(d.body))for(const e of d.body){if(e&&e.id&&e.date&&!body.some(x=>x.id===e.id))body.push(e)}
-  if(Array.isArray(d.groups))for(const g of d.groups){if(g&&g.id&&g.name&&!groups.some(x=>x.id===g.id))groups.push({id:g.id,name:g.name})}
-  if(!confirm(`לייבא ${list.length} תרגילים? תרגילים קיימים עם אותו מזהה יוחלפו.`))return;
-  for(const m of list){if(!m.id||!m.name||typeof m.weight!=='number')continue;m.history=m.history||[{t:m.updated||Date.now(),w:m.weight}];await put(m)}await saveGroups();await saveBody();await saveSessions();closeSheet();renderBody();load();alert('הייבוא הושלם')}catch{alert('קובץ גיבוי לא תקין')}e.target.value=''};
+$('#importFile').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(f)await importBackup(f)};
 function openGroups(){openSheet(`<h2>קבוצות שרירים</h2><ul class="hist">${groups.map(g=>`<li><span>${esc(g.name)} <small>(${machines.filter(m=>m.group===g.id).length})</small></span><span><button class="link" data-ren="${g.id}">✏️ שנה שם</button><button class="link" data-del="${g.id}" style="color:#f87171">🗑️ מחק</button></span></li>`).join('')}</ul>
   <label>קבוצה חדשה</label><div class="row"><input type="text" id="gNew" placeholder="למשל: ישבן"><button class="btn pri" id="gAdd" style="width:auto;margin:0">הוסף</button></div><button class="btn" id="gClose">סגור</button>`);
   $('#gClose').onclick=closeSheet;
