@@ -101,3 +101,4 @@ input[type=datetime-local]{width:100%;padding:12px;font-size:17px;border-radius:
 .card.plan{outline:3px solid #facc15;outline-offset:-3px}.card.pdone{outline-color:#22c55e}.card.pdone::after{content:'✓';position:absolute;top:6px;left:8px;background:#22c55e;color:#fff;border-radius:99px;width:26px;height:26px;display:grid;place-items:center;font-weight:700;z-index:2}
 .plan-h{color:#facc15}
 @media (max-width:360px),(max-height:640px){.fab{width:52px;height:52px;font-size:28px;left:12px;bottom:max(12px,env(safe-area-inset-bottom))}#tdGo{width:calc(100% - 48px);margin-left:48px}}
+.fab{z-index:6}
