@@ -18,7 +18,7 @@ const best=xs=>xs.reduce((a,x)=>!a||x.w>a.w||(x.w===a.w&&x.r>a.r)?x:a,null);
 const better=(a,b)=>a.w>b.w||(a.w===b.w&&a.r>b.r);
 // --- session bar ---
 let barTimer;
-function renderSessBar(){const b=$('#sessBar');clearInterval(barTimer);
+function renderSessBar(){const b=$('#sessBar');clearInterval(barTimer);if(typeof view!='undefined'&&groups.length)render();
   if(!session){b.innerHTML='<button class="btn pri start" id="startBtn">▶️ התחל אימון</button>';$('#startBtn').onclick=startSession;return}
   const upd=()=>{if(!session)return;b.innerHTML=`<div class="live"><span>🟢 אימון פעיל · <b>${durTxt(Date.now()-session.start)}</b> · ${session.sets.length} סטים</span><button class="btn danger" id="endBtn">⏹ סיים אימון</button></div><div class="hint">לחץ על תרגיל כדי לרשום סטים</div>`;$('#endBtn').onclick=endSession};
   upd();barTimer=setInterval(upd,20000)}
@@ -28,7 +28,7 @@ async function checkStale(){if(!session||session._staleAsked||Date.now()-session
   if(!last){if(confirm(`האימון פתוח כבר ${durTxt(Date.now()-session.start)} בלי סטים. לבטל אותו?`)){session=null;await saveActive();stopRest();renderSessBar()}return}
   if(confirm(`האימון פתוח כבר ${durTxt(Date.now()-session.start)}. נראה ששכחת לסיים אותו.\nלסיים אותו בזמן הסט האחרון (${hm(last)})?`))await endSession(last+60000,false)}
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkStale()});
-async function startSession(){session={id:newId(),start:Date.now(),sets:[]};await saveActive();renderSessBar();if(view!=='machines')setView('machines')}
+async function startSession(o){session={id:newId(),start:Date.now(),sets:[]};if(o&&Array.isArray(o.plan)){session.plan=o.plan;session.area=o.area;filter='all'}await saveActive();renderSessBar();if(view!=='machines')setView('machines');render();scrollTo(0,0)}
 async function endSession(endAt,ask=true){if(!session)return;
   if(!session.sets.length){if(confirm('לא נרשמו סטים. לבטל את האימון?')){session=null;await saveActive();stopRest();renderSessBar()}return}
   if(ask&&!confirm('לסיים את האימון?'))return;

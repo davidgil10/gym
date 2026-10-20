@@ -84,3 +84,19 @@ body:has(.restbar:not([hidden])) .sheet{bottom:calc(var(--rb) + env(safe-area-in
 .nudge{display:flex;gap:8px;align-items:center;margin:8px 12px 0;padding:8px 10px;background:#1e293b;border:1px solid #334155;border-radius:12px;font-size:14px}
 .nudge span{flex:1}.nudge button{background:#334155;color:#fff;padding:6px 10px;font-size:14px}.nudge #ndX{background:none;color:#94a3b8;padding:4px 6px}
 input[type=datetime-local]{width:100%;padding:12px;font-size:17px;border-radius:10px;border:1px solid #475569;background:#0f172a;color:#fff}
+/* ---- מה לאמן היום ---- */
+.today{margin:8px 12px 0;padding:8px 10px;background:#1e293b;border:1px solid #334155;border-radius:14px}
+.tdh{display:flex}.tdt{flex:1;display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;background:none;color:#fff;padding:2px 0;font-size:15px;text-align:start;min-width:0}
+.tdt span{overflow-wrap:anywhere}.tdc{margin-inline-start:auto;color:#94a3b8}
+.tdb{padding:1px 8px;border-radius:99px;font-size:12px;white-space:nowrap}
+.tdb.green,.tdp.green small{color:#4ade80}.tdb.orange,.tdp.orange small{color:#fb923c}.tdb.red,.tdp.red small{color:#f87171}
+.tdb.green{background:#14532d}.tdb.orange{background:#7c2d12}.tdb.red{background:#7f1d1d}
+.tdm{margin:6px 0;color:#cbd5e1;font-size:14px}
+.tda{display:flex;gap:6px;overflow-x:auto;padding:8px 0 4px;scrollbar-width:none}.tda::-webkit-scrollbar{display:none}
+.tdp{flex:none;display:flex;flex-direction:column;align-items:center;gap:1px;padding:5px 10px;border-radius:12px;background:#0f172a;color:#e2e8f0;border:2px solid transparent;font-size:13px;line-height:1.2}
+.tdp.green{border-color:#16653488}.tdp.orange{border-color:#c2410c88}.tdp.red{border-color:#b91c1c88}.tdp.on{background:#334155;border-color:#fff}
+.tdp small{font-size:11px}
+.tdx{margin:4px 0 8px;padding-inline-start:22px;font-size:14px}.tdx li{display:flex;justify-content:space-between;gap:8px;padding:2px 0}.tdx li span{overflow-wrap:anywhere;min-width:0}.tdx small{color:#94a3b8;white-space:nowrap}
+.today .btn{padding:11px;font-size:16px;margin:0}
+.card.plan{outline:3px solid #facc15;outline-offset:-3px}.card.pdone{outline-color:#22c55e}.card.pdone::after{content:'✓';position:absolute;top:6px;left:8px;background:#22c55e;color:#fff;border-radius:99px;width:26px;height:26px;display:grid;place-items:center;font-weight:700;z-index:2}
+.plan-h{color:#facc15}
