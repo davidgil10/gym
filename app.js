@@ -44,9 +44,9 @@ function render(){
   const tabs=[{id:'all',name:'הכל'},...groups,...(hasNone?[{id:NONE,name:'ללא קטגוריה'}]:[])];
   $('#chips').innerHTML=tabs.map(t=>{const n=t.id==='all'?machines.length:machines.filter(m=>m.group===t.id).length;return `<button class="chip${t.id===filter?' on':''}" data-g="${t.id}">${esc(t.name)} <small>${n}</small></button>`}).join('')+'<button class="chip" id="mgGroups">⚙️ קבוצות</button>';
   $('#empty').hidden=machines.length>0||view!=='machines';
-  if(filter==='all'){$('#grid').innerHTML=planHTML()+[...groups,{id:NONE,name:'ללא קטגוריה'}].map(g=>{const ms=machines.filter(m=>m.group===g.id);return ms.length?`<h3 class="sec">${esc(g.name)}</h3>`+ms.map(card).join(''):''}).join('')}
+  if(filter==='all'){$('#grid').innerHTML=(typeof planHTML=='function'?planHTML():'')+[...groups,{id:NONE,name:'ללא קטגוריה'}].map(g=>{const ms=machines.filter(m=>m.group===g.id);return ms.length?`<h3 class="sec">${esc(g.name)}</h3>`+ms.map(card).join(''):''}).join('')}
   else{const ms=machines.filter(m=>m.group===filter);$('#grid').innerHTML=ms.length?ms.map(card).join(''):'<p class="sec-empty">אין עדיין תרגילים בקבוצה הזו</p>'}
-  markPlan();renderToday();
+  if(typeof markPlan=='function'){markPlan();renderToday()}
 }
 $('#chips').addEventListener('click',e=>{const c=e.target.closest('.chip');if(!c)return;if(c.id==='mgGroups')return openGroups();filter=c.dataset.g;render();scrollTo(0,0)});
 $('#grid').addEventListener('click',e=>{const c=e.target.closest('.card');if(c)(session?openLog:openEdit)(c.dataset.id)});
@@ -179,7 +179,7 @@ function openBody(e){const last=sorted().slice(-1)[0]||{};
     await saveBody();await saveSessions();closeSheet();renderBody();toast(e?'הרישום עודכן':'הרישום נשמר',async()=>{body=before;await saveBody();renderBody()})};
   if(e)$('#bDel').onclick=async()=>{if(!confirm(`למחוק את הרישום מ-${fd(e.date)}?`))return;const before=structuredClone(body);body=body.filter(x=>x!==e);await saveBody();await saveSessions();closeSheet();renderBody();toast('הרישום נמחק',async()=>{body=before;await saveBody();renderBody()})}}
 function setView(v){view=v;document.querySelectorAll('.vt').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
-  $('#chips').hidden=$('#grid').hidden=v!=='machines';$('#empty').hidden=v!=='machines'||machines.length>0;$('#bodyView').hidden=v!=='body';$('#repView').hidden=v!=='reports';$('#addBtn').hidden=v==='reports';if(v==='body')renderBody();if(v==='reports')renderReports();renderToday();scrollTo(0,0)}
+  $('#chips').hidden=$('#grid').hidden=v!=='machines';$('#empty').hidden=v!=='machines'||machines.length>0;$('#bodyView').hidden=v!=='body';$('#repView').hidden=v!=='reports';$('#addBtn').hidden=v==='reports';if(v==='body')renderBody();if(v==='reports')renderReports();if(typeof renderToday=='function')renderToday();scrollTo(0,0)}
 document.querySelectorAll('.vt').forEach(b=>b.onclick=()=>setView(b.dataset.v));
 $('#addBtn').onclick=()=>view==='body'?openBody(null):openForm(null);
 $('#rM15').onclick=()=>adjRest(-15);$('#rP15').onclick=()=>adjRest(15);$('#rSkip').onclick=stopRest;$('#restSet').onclick=restPresets;

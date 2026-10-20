@@ -34,6 +34,14 @@ async function endSession(endAt,ask=true){if(!session)return;
   if(ask&&!confirm('לסיים את האימון?'))return;
   const s=session;s.end=typeof endAt==='number'?endAt:Date.now();sessions.push(s);session=null;await saveSessions();await saveActive();stopRest();renderSessBar();showSessionReport(s.id)}
 // --- logging sets ---
+// keep the card's current weight in sync with the heaviest set logged for it in the active workout
+async function syncCard(mid){const m=machines.find(x=>x.id===mid);if(!m||m.timed||!session)return;session.base=session.base||{};
+  const mine=session.sets.filter(x=>x.mid===mid);const tag='s:'+session.id;
+  if(!session.base[mid])session.base[mid]={weight:m.weight,reps:m.reps??null,updated:m.updated};
+  m.history=(m.history||[]).filter(h=>h.sid!==tag);
+  if(!mine.length){const b=session.base[mid];m.weight=b.weight;if(m.bw)m.reps=b.reps;m.updated=b.updated;delete session.base[mid]}
+  else{let h=mine[0];for(const x of mine)if(better(x,h))h=x;m.weight=h.w;if(m.bw)m.reps=h.r;m.updated=h.t;m.history.push(m.bw?{t:h.t,w:h.w,r:h.r,sid:tag}:{t:h.t,w:h.w,sid:tag})}
+  await put(m);await saveActive();if(typeof render==='function')render()}
 function openLog(id){const m=machines.find(x=>x.id===id);if(!m)return;if(m.timed)return openTimed(m);
   const mine=session.sets.filter(x=>x.mid===id),last=mine[mine.length-1];let w=last?last.w:m.weight,r=last?last.r:(m.bw&&m.reps?m.reps:10);const st=m.step||2.5;
   const prev=[...sessions].reverse().find(s=>s.sets.some(x=>x.mid===id));
@@ -48,9 +56,9 @@ function openLog(id){const m=machines.find(x=>x.id===id);if(!m)return;if(m.timed
   $('#wP').onclick=()=>{w=Math.round((w+st)*100)/100;upd()};$('#wM').onclick=()=>{w=Math.max(0,Math.round((w-st)*100)/100);upd()};
   $('#rP').onclick=()=>{r++;upd()};$('#rM').onclick=()=>{r=Math.max(1,r-1);upd()};
   $('#lClose').onclick=closeSheet;$('#lEdit').onclick=()=>openEdit(id);
-  $('#lDone').onclick=async()=>{const set={mid:id,name:m.name,gname:gName(m.group),w,r,t:Date.now()};session.sets.push(set);await saveActive();renderSessBar();openLog(id);startRest();
-    toast(`סט נרשם: ${fmt(w)}×${r}`,async()=>{session.sets=session.sets.filter(x=>x!==set);await saveActive();renderSessBar();if(!$('#sheet').hidden)openLog(id)})};
-  $('#sheet').querySelectorAll('[data-ds]').forEach(b=>b.onclick=async()=>{if(!confirm('למחוק את הסט?'))return;session.sets.splice(+b.dataset.ds,1);await saveActive();renderSessBar();openLog(id)})}
+  $('#lDone').onclick=async()=>{const set={mid:id,name:m.name,gname:gName(m.group),w,r,t:Date.now()};session.sets.push(set);await saveActive();await syncCard(id);renderSessBar();openLog(id);startRest();
+    toast(`סט נרשם: ${fmt(w)}×${r}`,async()=>{session.sets=session.sets.filter(x=>x!==set);await saveActive();await syncCard(id);renderSessBar();if(!$('#sheet').hidden)openLog(id)})};
+  $('#sheet').querySelectorAll('[data-ds]').forEach(b=>b.onclick=async()=>{if(!confirm('למחוק את הסט?'))return;session.sets.splice(+b.dataset.ds,1);await saveActive();await syncCard(id);renderSessBar();openLog(id)})}
 // --- rest timer (end-timestamp based) ---
 let restTick,restDone=false;
 const restDur=()=>+(localStorage.getItem('restDur')||90);
