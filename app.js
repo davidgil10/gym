@@ -183,7 +183,7 @@ function setView(v){view=v;document.querySelectorAll('.vt').forEach(b=>b.classLi
 document.querySelectorAll('.vt').forEach(b=>b.onclick=()=>setView(b.dataset.v));
 $('#addBtn').onclick=()=>view==='body'?openBody(null):openForm(null);
 $('#rM15').onclick=()=>adjRest(-15);$('#rP15').onclick=()=>adjRest(15);$('#rSkip').onclick=stopRest;$('#restSet').onclick=restPresets;
-openDB().then(loadGroups).then(async()=>{body=(await metaGet('body'))||[];sessions=(await metaGet('sessions'))||[];session=(await metaGet('active'))||null;renderSessBar();renderRest()}).then(load).then(()=>setView('machines')).then(libInit).then(resumeTimer).then(persistStorage).then(renderNudge).then(()=>checkStale());
+openDB().then(loadGroups).then(async()=>{body=(await metaGet('body'))||[];sessions=(await metaGet('sessions'))||[];session=(await metaGet('active'))||null;renderSessBar();renderRest()}).then(load).then(()=>setView('machines')).then(libInit).then(resumeTimer).then(persistStorage).then(renderNudge).then(()=>checkStale()).then(()=>typeof checkMotivation=='function'&&checkMotivation('open'));
 // ===== storage persistence + backup reminder =====
 let lastBackup=null;
 const backupTxt=t=>{if(!t)return'💾 גיבוי אחרון: עוד לא בוצע';const d=Math.floor((Date.now()-t)/864e5);return '💾 גיבוי אחרון: '+(d<1?'היום':d===1?'אתמול':`לפני ${d} ימים`)};

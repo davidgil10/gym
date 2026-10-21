@@ -32,7 +32,7 @@ async function startSession(o){session={id:newId(),start:Date.now(),sets:[]};if(
 async function endSession(endAt,ask=true){if(!session)return;
   if(!session.sets.length){if(confirm('לא נרשמו סטים. לבטל את האימון?')){session=null;await saveActive();stopRest();renderSessBar()}return}
   if(ask&&!confirm('לסיים את האימון?'))return;
-  const s=session;s.end=typeof endAt==='number'?endAt:Date.now();sessions.push(s);session=null;await saveSessions();await saveActive();stopRest();renderSessBar();showSessionReport(s.id)}
+  const s=session;s.end=typeof endAt==='number'?endAt:Date.now();sessions.push(s);session=null;await saveSessions();await saveActive();stopRest();renderSessBar();showSessionReport(s.id);if(typeof checkMotivation=='function')checkMotivation('report')}
 // --- difficulty rating (asked once per exercise, when closing it) ---
 const RATE_TXT=['','קל מאוד','קל','בינוני','קשה','קשה מאוד'];
 function finishExercise(id){if(!session||!session.sets.some(x=>x.mid===id)||(session.rates||{})[id]||(session.rateSkip||[]).includes(id))return closeSheet();openRate(id)}
