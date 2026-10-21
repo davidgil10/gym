@@ -8,11 +8,11 @@ const hm=t=>new Date(t).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-dig
 const vol=sets=>sets.reduce((a,x)=>a+x.w*x.r,0);
 const nf=n=>Math.round(n).toLocaleString('he-IL');
 const pctTxt=(a,b)=>b?` (${a>=b?'+':'−'}${Math.abs(Math.round((a-b)/b*100))}%)`:'';
-const mName=x=>{const m=machines.find(y=>y.id===x.mid);return m?m.name:x.name};
-const mGroup=x=>{const m=machines.find(y=>y.id===x.mid);return m?gName(m.group):(x.gname||'ללא קטגוריה')};
-const isBW=mid=>{const m=machines.find(y=>y.id===mid);return !!(m&&m.bw)};
+const mName=x=>{const m=allM.find(y=>y.id===x.mid);return m?m.name:x.name};
+const mGroup=x=>{const m=allM.find(y=>y.id===x.mid);return m?gName(m.group):(x.gname||'ללא קטגוריה')};
+const isBW=mid=>{const m=allM.find(y=>y.id===mid);return !!(m&&m.bw)};
 const bwTxt=(w,r)=>w>0?`<bdi dir="ltr">${r}×+${fmt(w)}</bdi> ק״ג`:`${r} חזרות`;
-const isTimed=mid=>{const m=machines.find(y=>y.id===mid);return !!(m&&m.timed)};
+const isTimed=mid=>{const m=allM.find(y=>y.id===mid);return !!(m&&m.timed)};
 const setTxt=x=>isTimed(x.mid)?`⏱ ${mmss(x.s||0)}`:isBW(x.mid)?bwTxt(x.w,x.r):`${fmt(x.w)}×${x.r}`;
 const best=xs=>xs.reduce((a,x)=>!a||x.w>a.w||(x.w===a.w&&x.r>a.r)?x:a,null);
 const better=(a,b)=>a.w>b.w||(a.w===b.w&&a.r>b.r);

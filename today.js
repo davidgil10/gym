@@ -1,4 +1,5 @@
 // ===== "מה לאמן היום" – recommendation card =====
+// Area recency counts sets on archived exercises too (history stays linked); suggested exercises come only from active (main-page) ones.
 let todayPick=null;
 const dayStart=t=>{const d=new Date(t);d.setHours(0,0,0,0);return d.getTime()};
 const daysAgo=t=>Math.round((dayStart(Date.now())-dayStart(t))/864e5);
@@ -8,7 +9,7 @@ function lastDoneMap(){const L={};const all=[...sessions,...(session?[session]:[
   for(const s of all)for(const x of s.sets||[]){const t=x.t||s.start;if(!(L[x.mid]>=t))L[x.mid]=t}return L}
 function areaStats(){const L=lastDoneMap();
   return groups.map((g,i)=>{const ms=machines.filter(m=>m.group===g.id);if(!ms.length)return null;
-    const ts=ms.map(m=>L[m.id]).filter(Boolean);const last=ts.length?Math.max(...ts):null;
+    const ts=allM.filter(m=>m.group===g.id).map(m=>L[m.id]).filter(Boolean);const last=ts.length?Math.max(...ts):null;
     return {g,i,ms,last,days:last==null?null:daysAgo(last)}}).filter(Boolean)
    .sort((a,b)=>(b.days==null?1e9:b.days)-(a.days==null?1e9:a.days)||a.i-b.i)}
 function pickExercises(a,n=3){const L=lastDoneMap();const done=a.ms.filter(m=>L[m.id]).sort((x,y)=>L[x.id]-L[y.id]),never=a.ms.filter(m=>!L[m.id]);
@@ -39,7 +40,7 @@ function renderToday(){const el=$('#today');if(!el)return;
 const SET_GOAL=9;
 function planAreas(){if(!session)return null;if(session.areas&&session.areas.length)return session.areas;
   if(session.plan&&session.plan.length){session.areas=[{g:null,name:session.area||'התוכנית',mids:session.plan.slice(),done:null}];return session.areas}return null}
-const areaSets=(a,sets)=>sets.filter(x=>{const m=machines.find(y=>y.id===x.mid);return a.g?(m?m.group===a.g:false)||a.mids.includes(x.mid):a.mids.includes(x.mid)}).length;
+const areaSets=(a,sets)=>sets.filter(x=>{const m=allM.find(y=>y.id===x.mid);return a.g?(m?m.group===a.g:false)||a.mids.includes(x.mid):a.mids.includes(x.mid)}).length;
 const pctOf=n=>Math.min(100,Math.round(n/SET_GOAL*100));
 function curArea(){const A=planAreas();return A?A.find(a=>!a.done)||null:null}
 function planHTML(){const A=planAreas();if(!A)return'';const cur=curArea();let h='';

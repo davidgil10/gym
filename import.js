@@ -9,7 +9,7 @@ function planImport(d){const list=Array.isArray(d)?d:d&&d.machines;if(!Array.isA
     if(ex)gMap[g.id]=ex.id;else{const n={id:g.id,name:String(g.name)};G.push(n);newGroups.push(n);gMap[g.id]=n.id}}
   const mapG=id=>id==null?id:(gMap[id]||(G.some(x=>x.id===id)?id:NONE));
   // machines
-  const cur=new Map(machines.map(m=>[m.id,structuredClone(m)])),idMap={},touched=new Map();let added=0,merged=0,skipped=0;
+  const cur=new Map(allM.map(m=>[m.id,structuredClone(m)])),idMap={},touched=new Map();let added=0,merged=0,skipped=0;
   const lastT=h=>(h&&h.length)?Math.max(...h.map(x=>x.t||0)):0;
   for(const raw of list){if(!raw||!raw.id||!raw.name||typeof raw.weight!=='number'){skipped++;continue}
     const m=structuredClone(raw);m.history=Array.isArray(m.history)?m.history:[{t:m.updated||Date.now(),w:m.weight}];

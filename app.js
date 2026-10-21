@@ -7,7 +7,7 @@ let db;
 function openDB(){return new Promise((res,rej)=>{const r=indexedDB.open('gym',2);r.onupgradeneeded=e=>{const d=r.result;if(e.oldVersion<1)d.createObjectStore('machines',{keyPath:'id'});if(e.oldVersion<2)d.createObjectStore('meta')};r.onsuccess=()=>{db=r.result;res()};r.onerror=()=>rej(r.error)})}
 const tx=(m,f)=>new Promise((res,rej)=>{const t=db.transaction('machines',m);const s=t.objectStore('machines');const r=f(s);t.oncomplete=()=>res(r&&r.result);t.onerror=()=>rej(t.error)});
 const all=()=>tx('readonly',s=>s.getAll());const put=m=>tx('readwrite',s=>s.put(m));const del=id=>tx('readwrite',s=>s.delete(id));
-let machines=[],groups=[],filter='all';
+let machines=[],allM=[],groups=[],filter='all';
 const NONE='none';const DEF=['חזה','גב','כתפיים','יד קדמית','יד אחורית','רגליים','בטן'];
 const metaGet=k=>new Promise(res=>{const r=db.transaction('meta').objectStore('meta').get(k);r.onsuccess=()=>res(r.result)});
 const metaPut=(k,v)=>new Promise(res=>{const t=db.transaction('meta','readwrite');t.objectStore('meta').put(v,k);t.oncomplete=res});
@@ -15,14 +15,19 @@ const gName=id=>(groups.find(g=>g.id===id)||{name:'ללא קטגוריה'}).name
 const newId=()=>crypto.randomUUID?crypto.randomUUID():Date.now()+''+Math.random();
 async function loadGroups(){groups=await metaGet('groups');if(!groups){groups=DEF.map((n,i)=>({id:'g'+(i+1),name:n}));await metaPut('groups',groups)}}
 const saveGroups=()=>metaPut('groups',groups);
-async function load(){machines=(await all()).sort((a,b)=>a.created-b.created);for(const m of machines)if(!m.group||!groups.some(g=>g.id===m.group))m.group=NONE;
+async function load(){allM=(await all()).sort((a,b)=>a.created-b.created);machines=allM;for(const m of machines)if(!m.group||!groups.some(g=>g.id===m.group))m.group=NONE;
   const bwDone=(await metaGet('bwMigrated'))||[],todo=BW_KEYS.filter(k=>!bwDone.includes(k));
   if(todo.length){for(const m of machines)if(todo.includes(m.lib)&&!m.bw){m.bw=true;if(m.reps===undefined)m.reps=null;await put(m)}await metaPut('bwMigrated',[...bwDone,...todo])}
   const tDone=(await metaGet('timedMigrated'))||[],tTodo=TIMED_KEYS.filter(k=>!tDone.includes(k));
   if(tTodo.length){for(const m of machines)if(tTodo.includes(m.lib)&&!m.timed)await makeTimed(m,true);await metaPut('timedMigrated',[...tDone,...tTodo])}
   for(const m of machines){if(m.bw||m.timed)continue;const h=(m.history||[]).filter(x=>x.w>0);let ch=h.length!==(m.history||[]).length;if(!h.length&&m.weight>0){h.push({t:m.updated||Date.now(),w:m.weight});ch=true}if(ch){m.history=h;await put(m)}}
-  for(const m of machines){const L=m.lib&&typeof LIBRARY!=='undefined'&&LIBRARY.find(e=>e.key===m.lib);if(L&&typeof m.photo==='string'&&m.photo.startsWith('img/')&&m.photo!==L.img){m.photo=L.img;await put(m)}}render()}
+  for(const m of machines){const L=m.lib&&typeof LIBRARY!=='undefined'&&LIBRARY.find(e=>e.key===m.lib);if(L&&typeof m.photo==='string'&&m.photo.startsWith('img/')&&m.photo!==L.img){m.photo=L.img;await put(m)}}machines=allM.filter(m=>!m.archived);render()}
 const BW_KEYS=['pull-up','dips','crunch','oblique-crunch'],TIMED_KEYS=['plank'],NEW_LIB_KEYS=['oblique-crunch'];
+// original built-ins (auto-added on fresh install / "restore"); the rest of LIBRARY is opt-in via "➕ הוסף תרגילים"
+const ORIG_KEYS=['bench-press','incline-press','pec-deck','chest-press-machine','cable-crossover','lat-pulldown','seated-row','barbell-row','pull-up','deadlift','shoulder-press','lateral-raise','reverse-fly','face-pull','barbell-curl','dumbbell-curl','hammer-curl','cable-curl','triceps-pushdown','skull-crusher','dips','squat','leg-press','leg-extension','leg-curl','lunge','calf-raise','hip-thrust','crunch','oblique-crunch','plank','leg-raise'];
+const libType=e=>e.type||(BW_KEYS.includes(e.key)?'bw':TIMED_KEYS.includes(e.key)?'timed':'');
+const libRec=(e,gid,t)=>{const y=libType(e);return {id:newId(),lib:e.key,...(y==='bw'?{bw:true,reps:null}:y==='timed'?{timed:true,secs:null}:{}),name:e.name,group:gid,photo:e.img,weight:0,step:2.5,created:t,updated:t,history:[]}};
+const libRecOf=e=>allM.find(m=>m.lib===e.key||m.name.trim()===e.name);
 const sgn=n=>(n>0?'+':n<0?'−':'')+fmt(Math.abs(n));
 const fromStart=m=>{const f=m.history.find(h=>h.w>0);if(!f||!(m.weight>0))return'';const s0=f.w,d=m.weight-s0;if(!d)return'';const pc=s0?` (${sgn(d/s0*100).replace(/(\.\d)\d+/,'$1')}%)`:'';return `<span style="color:${d>0?'#4ade80':'#f87171'}"><bdi dir="ltr">${sgn(d)}</bdi> ק״ג מההתחלה <bdi dir="ltr">${pc.trim()}</bdi></span>`};
 async function makeTimed(m,on){if(on){m.timed=true;m.bw=false;m.oldHistory=[...(m.oldHistory||[]),...(m.history||[])];m.history=m.timeHistory||[];m.secs=m.history.length?m.history[m.history.length-1].s:null}
@@ -44,12 +49,12 @@ function render(){
   const tabs=[{id:'all',name:'הכל'},...groups,...(hasNone?[{id:NONE,name:'ללא קטגוריה'}]:[])];
   $('#chips').innerHTML=tabs.map(t=>{const n=t.id==='all'?machines.length:machines.filter(m=>m.group===t.id).length;return `<button class="chip${t.id===filter?' on':''}" data-g="${t.id}">${esc(t.name)} <small>${n}</small></button>`}).join('')+'<button class="chip" id="mgGroups">⚙️ קבוצות</button>';
   $('#empty').hidden=machines.length>0||view!=='machines';
-  if(filter==='all'){$('#grid').innerHTML=(typeof planHTML=='function'?planHTML():'')+[...(typeof groupsByNeglect=='function'?groupsByNeglect():groups),{id:NONE,name:'ללא קטגוריה'}].map(g=>{const ms=machines.filter(m=>m.group===g.id);return ms.length?`<h3 class="sec">${esc(g.name)}</h3>`+ms.map(card).join(''):''}).join('')}
-  else{const ms=machines.filter(m=>m.group===filter);$('#grid').innerHTML=ms.length?ms.map(card).join(''):'<p class="sec-empty">אין עדיין תרגילים בקבוצה הזו</p>'}
+  if(filter==='all'){$('#grid').innerHTML=(typeof planHTML=='function'?planHTML():'')+[...(typeof groupsByNeglect=='function'?groupsByNeglect():groups),{id:NONE,name:'ללא קטגוריה'}].map(g=>{const ms=machines.filter(m=>m.group===g.id),av=g.id!==NONE&&libAvail(g.id).length;return ms.length||av?secHead(g)+ms.map(card).join(''):''}).join('')}
+  else{const ms=machines.filter(m=>m.group===filter),g=groups.find(x=>x.id===filter);$('#grid').innerHTML=(g&&libAvail(g.id).length?secHead(g):'')+(ms.length?ms.map(card).join(''):'<p class="sec-empty">אין עדיין תרגילים בקבוצה הזו</p>')}
   if(typeof markPlan=='function'){markPlan();renderToday()}
 }
 $('#chips').addEventListener('click',e=>{const c=e.target.closest('.chip');if(!c)return;if(c.id==='mgGroups')return openGroups();filter=c.dataset.g;render();scrollTo(0,0)});
-$('#grid').addEventListener('click',e=>{const c=e.target.closest('.card');if(c)(session?openLog:openEdit)(c.dataset.id)});
+$('#grid').addEventListener('click',e=>{const a=e.target.closest('[data-addlib]');if(a)return openLibPick(a.dataset.addlib);const c=e.target.closest('.card');if(c)(session?openLog:openEdit)(c.dataset.id)});
 // image compress
 function compress(file,max=900,q=.75){return new Promise((res,rej)=>{const img=new Image();const u=URL.createObjectURL(file);img.onload=()=>{let{width:w,height:h}=img;const k=Math.min(1,max/Math.max(w,h));w=Math.round(w*k);h=Math.round(h*k);const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);URL.revokeObjectURL(u);res(c.toDataURL('image/jpeg',q))};img.onerror=rej;img.src=u})}
 // sheet
@@ -68,12 +73,13 @@ function openForm(m){const st={photo:m?m.photo:null};
   <label class="chk"><input type="checkbox" id="fBW" ${m&&m.bw?'checked':''}> תרגיל משקל גוף (חזרות + משקל נוסף, 0 = משקל גוף)</label>
   <label class="chk"><input type="checkbox" id="fTM" ${m&&m.timed?'checked':''}> תרגיל זמן (סטופר, בלי משקל)</label>
   ${m?'':'<label>משקל התחלתי (ק״ג)</label><input type="number" id="fW" inputmode="decimal" step="0.5" min="0" value="10">'}
-  <button class="btn pri" id="fSave">שמור</button>${m?'<button class="btn danger" id="fDel">🗑️ מחק תרגיל</button>':''}<button class="btn" id="fCancel">ביטול</button>`);
+  <button class="btn pri" id="fSave">שמור</button>${m?'<button class="btn" id="fArc">📚 הסר מהעמוד הראשי (חוזר לספרייה)</button><button class="btn danger" id="fDel">🗑️ מחק לצמיתות</button>':''}<button class="btn" id="fCancel">ביטול</button>`);
   $('#fG').value=m?m.group:(filter!=='all'?filter:(groups[0]||{id:NONE}).id);$('#fBW').onchange=()=>{if($('#fBW').checked)$('#fTM').checked=false};$('#fTM').onchange=()=>{if($('#fTM').checked)$('#fBW').checked=false};wirePhoto(st);$('#fCancel').onclick=m?()=>openEdit(m.id):closeSheet;
   $('#fSave').onclick=async()=>{const name=$('#fName').value.trim();if(!name){$('#fName').focus();return alert('צריך שם לתרגיל')}
     const group=$('#fG').value,bw=$('#fBW').checked,tm=$('#fTM').checked;if(m){m.name=name;m.photo=st.photo;m.group=group;if(tm!==!!m.timed){await makeTimed(m,tm);await load();openEdit(m.id);return}if(bw&&!m.bw){m.bw=true;if(m.reps===undefined)m.reps=null}else if(!bw&&m.bw)m.bw=false;await put(m);await load();openEdit(m.id);return}
     const w=parseFloat($('#fW').value);if(!(w>=0))return alert('משקל לא תקין');const now=Date.now();
     await put({id:newId(),name,group,...(tm?{timed:true,secs:null}:bw?{bw:true,reps:null}:{}),photo:st.photo,weight:w,step:2.5,created:now,updated:now,history:(w>0&&!bw&&!tm)?[{t:now,w}]:[]});closeSheet();load()};
+  if(m)$('#fArc').onclick=()=>archiveEx(m);
   if(m)$('#fDel').onclick=async()=>{if(confirm(`למחוק את "${m.name}" כולל כל ההיסטוריה? אי אפשר לבטל.`)){await del(m.id);closeSheet();load()}}}
 
 function openEditBW(m){let r=m.reps==null||m.reps<1?8:m.reps,w=m.weight||0,step=m.step||2.5;const hist=[...m.history].reverse();
@@ -119,7 +125,7 @@ let tt;function toast(msg,undo){$('#toastMsg').textContent=msg;$('#toast').hidde
 $('#menuBtn').onclick=()=>{openSheet(`<h2>גיבוי</h2><p style="opacity:.8;font-size:14px">הנתונים שמורים רק בטלפון הזה. מומלץ לייצא גיבוי מדי פעם.</p>
   <p class="ver" id="mLast" style="margin:0 0 8px;opacity:.8">${backupTxt(lastBackup)}</p><button class="btn" id="mLib">📚 שחזר תרגילים מובנים</button><button class="btn" id="mExp">⬇️ ייצוא גיבוי (JSON)</button><button class="btn" id="mImp">⬆️ ייבוא גיבוי</button><button class="btn" id="mClose">סגור</button><p class="ver">גרסה ${typeof APP_VERSION!=='undefined'?APP_VERSION:'?'}</p>`);
   $('#mClose').onclick=closeSheet;$('#mLib').onclick=async()=>{const n=await addLibrary();closeSheet();toast(n?`נוספו ${n} תרגילים מובנים`:'כל התרגילים המובנים כבר קיימים',null)};
-  $('#mExp').onclick=async()=>{await metaPut('lastBackup',Date.now());renderNudge();$('#mLast').textContent=backupTxt(Date.now());const b=new Blob([JSON.stringify({app:'gym-weights',v:2,exported:Date.now(),groups,machines,body,sessions},null,1)],{type:'application/json'});
+  $('#mExp').onclick=async()=>{await metaPut('lastBackup',Date.now());renderNudge();$('#mLast').textContent=backupTxt(Date.now());const b=new Blob([JSON.stringify({app:'gym-weights',v:2,exported:Date.now(),groups,machines:allM,body,sessions},null,1)],{type:'application/json'});
     const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`gym-backup-${new Date().toISOString().slice(0,10)}.json`;a.click()};
   $('#mImp').onclick=()=>$('#importFile').click()};
 $('#importFile').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(f)await importBackup(f)};
@@ -128,20 +134,36 @@ function openGroups(){openSheet(`<h2>קבוצות שרירים</h2><ul class="hi
   $('#gClose').onclick=closeSheet;
   $('#gAdd').onclick=async()=>{const n=$('#gNew').value.trim();if(!n)return;if(groups.some(g=>g.name===n))return alert('קבוצה בשם הזה כבר קיימת');groups.push({id:newId(),name:n});await saveGroups();render();openGroups()};
   $('#sheet').querySelectorAll('[data-ren]').forEach(b=>b.onclick=async()=>{const g=groups.find(x=>x.id===b.dataset.ren);const n=(prompt('שם חדש לקבוצה:',g.name)||'').trim();if(!n||n===g.name)return;g.name=n;await saveGroups();render();openGroups()});
-  $('#sheet').querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{const g=groups.find(x=>x.id===b.dataset.del);const ms=machines.filter(m=>m.group===g.id);
+  $('#sheet').querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{const g=groups.find(x=>x.id===b.dataset.del);const ms=allM.filter(m=>m.group===g.id);
     if(!confirm(`למחוק את הקבוצה "${g.name}"?`+(ms.length?` ${ms.length} תרגילים יעברו ל"ללא קטגוריה".`:'')))return;
     for(const m of ms){m.group=NONE;await put(m)}groups=groups.filter(x=>x!==g);await saveGroups();await load();openGroups()})}
 // ===== built-in exercise library =====
-async function addLibrary(){const have=new Set(machines.map(m=>m.name.trim()));let n=0,now=Date.now();
-  for(const e of LIBRARY){if(have.has(e.name))continue;const g=groups.find(x=>x.name===e.group);
-    await put({id:newId(),lib:e.key,...(BW_KEYS.includes(e.key)?{bw:true,reps:null}:TIMED_KEYS.includes(e.key)?{timed:true,secs:null}:{}),name:e.name,group:g?g.id:NONE,photo:e.img,weight:0,step:2.5,created:now+n,updated:now+n,history:[]});n++}
+async function addLibrary(){let n=0,now=Date.now();
+  for(const e of LIBRARY.filter(e=>ORIG_KEYS.includes(e.key))){if(libRecOf(e))continue;const g=groups.find(x=>x.name===e.group);
+    await put(libRec(e,g?g.id:NONE,now+n));n++}
   await load();return n}
+// ===== exercise library per area =====
+function libAvail(gid){const g=groups.find(x=>x.id===gid);if(!g)return[];const out=allM.filter(m=>m.archived&&m.group===gid).map(m=>({m,name:m.name,img:m.photo,id:m.id}));
+  for(const e of LIBRARY){if(e.group!==g.name||libRecOf(e))continue;out.push({e,name:e.name,img:e.img,id:'lib:'+e.key})}return out}
+const secHead=g=>`<div class="sech"><h3 class="sec">${esc(g.name)}</h3>${g.id!==NONE&&libAvail(g.id).length?`<button class="addlib" data-addlib="${g.id}">➕ הוסף תרגילים</button>`:''}</div>`;
+function openLibPick(gid){const g=groups.find(x=>x.id===gid),items=libAvail(gid);if(!g)return;const sel=new Set();
+  openSheet(`<h2>➕ הוסף תרגילים · ${esc(g.name)}</h2><p class="muted" style="font-size:13px;margin:0 0 8px">בחר תרגילים מהספרייה להוספה לעמוד הראשי</p>
+  ${items.length?`<div class="libpick">${items.map(x=>`<button class="lp" data-lp="${esc(x.id)}">${x.img?`<img src="${x.img}" alt="" loading="lazy">`:'<div class="ph">🏋️</div>'}<span>${esc(x.name)}${x.m&&x.m.history&&x.m.history.length?' <small>· יש היסטוריה</small>':''}</span><i>✓</i></button>`).join('')}</div>`:'<p class="sec-empty">כל תרגילי הספרייה של האזור כבר בעמוד הראשי</p>'}
+  <button class="btn pri" id="lpAdd" disabled>הוסף</button><button class="btn" id="lpClose">סגור</button>`);
+  const upd=()=>{$('#lpAdd').disabled=!sel.size;$('#lpAdd').textContent=sel.size?`הוסף ${sel.size} תרגילים`:'הוסף'};
+  $('#sheet').querySelectorAll('[data-lp]').forEach(b=>b.onclick=()=>{const k=b.dataset.lp;sel.has(k)?sel.delete(k):sel.add(k);b.classList.toggle('on',sel.has(k));upd()});
+  $('#lpClose').onclick=closeSheet;
+  $('#lpAdd').onclick=async()=>{let n=0;const now=Date.now();for(const x of items){if(!sel.has(x.id))continue;
+      if(x.m){x.m.archived=false;x.m.created=now+n;await put(x.m)}else await put(libRec(x.e,gid,now+n));n++}
+    closeSheet();await load();toast(`נוספו ${n} תרגילים ל${g.name}`,null)}}
+async function archiveEx(m){if(!confirm(`להסיר את "${m.name}" מהעמוד הראשי?\nהתרגיל וכל ההיסטוריה שלו נשמרים ויחזרו לספרייה של האזור (➕ הוסף תרגילים).`))return;
+  m.archived=true;await put(m);closeSheet();await load();toast(`"${m.name}" הוסר לספרייה`,async()=>{m.archived=false;await put(m);await load()})}
 async function libInit(){if(await metaGet('libDone')){const done=(await metaGet('libNewAdded'))||[],todo=NEW_LIB_KEYS.filter(k=>!done.includes(k));
-    if(todo.length){let n=0;const have=new Set(machines.map(m=>m.name.trim()));for(const e of LIBRARY.filter(e=>todo.includes(e.key)&&!have.has(e.name))){const g=groups.find(x=>x.name===e.group);
-      await put({id:newId(),lib:e.key,...(BW_KEYS.includes(e.key)?{bw:true,reps:null}:{}),name:e.name,group:g?g.id:NONE,photo:e.img,weight:0,step:2.5,created:Date.now()+n,updated:Date.now(),history:[]});n++}
+    if(todo.length){let n=0;for(const e of LIBRARY.filter(e=>todo.includes(e.key)&&!libRecOf(e))){const g=groups.find(x=>x.name===e.group);
+      await put(libRec(e,g?g.id:NONE,Date.now()+n));n++}
       await metaPut('libNewAdded',[...done,...todo]);if(n){await load();toast(`נוסף תרגיל חדש לספרייה: ${LIBRARY.filter(e=>todo.includes(e.key)).map(e=>e.name).join(', ')}`,null)}}return}
   await metaPut('libDone',1);await metaPut('libNewAdded',NEW_LIB_KEYS);
-  if(!machines.length){await addLibrary();return}
+  if(!allM.length){await addLibrary();return}
   if(confirm('להוסיף את ספריית התרגילים?\n(כ-30 תרגילים נפוצים עם איורים. התרגילים והנתונים שלך לא ישתנו)')){const n=await addLibrary();toast(`נוספו ${n} תרגילים מובנים`,null)}}
 // ===== body tracking =====
 let body=[],view='machines';
@@ -187,7 +209,7 @@ openDB().then(loadGroups).then(async()=>{body=(await metaGet('body'))||[];sessio
 // ===== storage persistence + backup reminder =====
 let lastBackup=null;
 const backupTxt=t=>{if(!t)return'💾 גיבוי אחרון: עוד לא בוצע';const d=Math.floor((Date.now()-t)/864e5);return '💾 גיבוי אחרון: '+(d<1?'היום':d===1?'אתמול':`לפני ${d} ימים`)};
-const hasData=()=>machines.some(m=>m.history&&m.history.length)||sessions.length||body.length;
+const hasData=()=>allM.some(m=>m.history&&m.history.length)||sessions.length||body.length;
 async function renderNudge(){lastBackup=(await metaGet('lastBackup'))||null;const dis=(await metaGet('nudgeDismissed'))||0,b=$('#nudge');
   const old=!lastBackup||Date.now()-lastBackup>14*864e5,snoozed=Date.now()-dis<7*864e5;
   if(!old||snoozed||!hasData()){b.hidden=true;return}

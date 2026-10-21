@@ -5,7 +5,7 @@ const MOT_M=['🏆 חודש מושלם! כל שבוע בחודש היה שבוע
 const wkStart=t=>{const d=new Date(t);d.setHours(0,0,0,0);d.setDate(d.getDate()-d.getDay());return +d};
 const addDays=(t,n)=>{const d=new Date(t);d.setDate(d.getDate()+n);return +d};
 const motAreas=()=>groups.filter(g=>machines.some(m=>m.group===g.id));
-function trainedIn(a,b){const S=new Set();for(const s of [...sessions,...(session?[session]:[])])for(const x of s.sets||[]){const t=x.t||s.start;if(t>=a&&t<b){const m=machines.find(y=>y.id===x.mid);if(m&&m.group!==NONE)S.add(m.group)}}return S}
+function trainedIn(a,b){const S=new Set();for(const s of [...sessions,...(session?[session]:[])])for(const x of s.sets||[]){const t=x.t||s.start;if(t>=a&&t<b){const m=allM.find(y=>y.id===x.mid);if(m&&m.group!==NONE)S.add(m.group)}}return S}
 function weekStatus(a){a=wkStart(a);const b=addDays(a,7),A=motAreas(),S=trainedIn(a,b),done=A.filter(g=>S.has(g.id));
   return {a,b,key:ymd(a),done:done.length,total:A.length,missing:A.filter(g=>!S.has(g.id)).map(g=>g.name),complete:A.length>0&&done.length===A.length}}
 const weekMonth=a=>{const w=new Date(addDays(a,3));return {y:w.getFullYear(),m:w.getMonth()}};
