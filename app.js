@@ -228,3 +228,5 @@ if('serviceWorker' in navigator){let clicked=false,reloaded=false;
     check();watch(reg.installing);reg.addEventListener('updatefound',()=>watch(reg.installing));
     const upd=()=>reg.update().catch(()=>{});upd();
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)upd()});addEventListener('focus',upd);setInterval(upd,30*60*1000)}).catch(()=>{})}
+// iOS fallback: block double-tap-to-zoom gesture without swallowing taps (each tap still fires its own click)
+document.addEventListener('dblclick',e=>e.preventDefault(),{passive:false});
