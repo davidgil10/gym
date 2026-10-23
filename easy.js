@@ -1,5 +1,5 @@
 // --- ease data, easy hint, demo videos (easy3) ---
-const VIDEO_KEYS=['bench-press','squat'];
+const VIDEO_KEYS=['arnold-press','back-extension','barbell-curl','barbell-row','bench-press','cable-crossover','cable-curl','cable-lateral-raise','chest-press-machine','close-grip-pulldown','deadlift','decline-press','dumbbell-curl','dumbbell-fly','dumbbell-press','dumbbell-row','dumbbell-shoulder-press','face-pull','front-raise','incline-dumbbell-press','incline-press','lat-pulldown','lateral-raise','machine-row','machine-shoulder-press','pec-deck','pullover','push-up','reverse-fly','seated-row','shoulder-press','smith-bench','squat','straight-arm-pulldown','t-bar-row'];
 const VIDEOS=Object.fromEntries(VIDEO_KEYS.map(k=>[k,`videos/${k}.mp4`]));
 const tipsOf=m=>{const u=(m.tips||'').split('\n').map(x=>x.trim()).filter(Boolean);return u.length?u:(m.lib&&TIPS[m.lib])||[]};
 function easyIn(list){const out={};for(const s of list){const rt=s.rates||{};for(const k in rt)if(rt[k]>0&&rt[k]<=2){const x=s.sets.find(y=>y.mid===k);out[k]=x?mName(x):k}}return Object.values(out)}
