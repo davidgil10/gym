@@ -73,13 +73,14 @@ function openForm(m){const st={photo:m?m.photo:null};
   <label>אזור בגוף</label><select id="fG">${groups.map(g=>`<option value="${g.id}">${esc(g.name)}</option>`).join('')}<option value="${NONE}">ללא קטגוריה</option></select>
   <label class="chk"><input type="checkbox" id="fBW" ${m&&m.bw?'checked':''}> תרגיל משקל גוף (חזרות + משקל נוסף, 0 = משקל גוף)</label>
   <label class="chk"><input type="checkbox" id="fTM" ${m&&m.timed?'checked':''}> תרגיל זמן (סטופר, בלי משקל)</label>
+  <label>דגשים לביצוע (לא חובה, שורה לכל דגש)</label><textarea id="fTips" rows="3" placeholder="${esc(((m&&m.lib&&TIPS[m.lib])||['למשל: גב ישר','ירידה איטית']).join('\n'))}">${m&&m.tips?esc(m.tips):''}</textarea>
   ${m?'':'<label>משקל התחלתי (ק״ג)</label><input type="number" id="fW" inputmode="decimal" step="0.5" min="0" value="10">'}
   <button class="btn pri" id="fSave">שמור</button>${m?'<button class="btn" id="fArc">📚 הסר מהעמוד הראשי (חוזר לספרייה)</button><button class="btn danger" id="fDel">🗑️ מחק לצמיתות</button>':''}<button class="btn" id="fCancel">ביטול</button>`);
   $('#fG').value=m?m.group:(filter!=='all'?filter:(groups[0]||{id:NONE}).id);$('#fBW').onchange=()=>{if($('#fBW').checked)$('#fTM').checked=false};$('#fTM').onchange=()=>{if($('#fTM').checked)$('#fBW').checked=false};wirePhoto(st);$('#fCancel').onclick=m?()=>openEdit(m.id):closeSheet;
   $('#fSave').onclick=async()=>{const name=$('#fName').value.trim();if(!name){$('#fName').focus();return alert('צריך שם לתרגיל')}
-    const group=$('#fG').value,bw=$('#fBW').checked,tm=$('#fTM').checked;if(m){m.name=name;m.photo=st.photo;m.group=group;if(tm!==!!m.timed){await makeTimed(m,tm);await load();openEdit(m.id);return}if(bw&&!m.bw){m.bw=true;if(m.reps===undefined)m.reps=null}else if(!bw&&m.bw)m.bw=false;await put(m);await load();openEdit(m.id);return}
+    const group=$('#fG').value,bw=$('#fBW').checked,tm=$('#fTM').checked,tips=$('#fTips').value.trim();if(m){m.name=name;if(tips)m.tips=tips;else delete m.tips;m.photo=st.photo;m.group=group;if(tm!==!!m.timed){await makeTimed(m,tm);await load();openEdit(m.id);return}if(bw&&!m.bw){m.bw=true;if(m.reps===undefined)m.reps=null}else if(!bw&&m.bw)m.bw=false;await put(m);await load();openEdit(m.id);return}
     const w=parseFloat($('#fW').value);if(!(w>=0))return alert('משקל לא תקין');const now=Date.now();
-    await put({id:newId(),name,group,...(tm?{timed:true,secs:null}:bw?{bw:true,reps:null}:{}),photo:st.photo,weight:w,step:1,created:now,updated:now,history:(w>0&&!bw&&!tm)?[{t:now,w}]:[]});closeSheet();load()};
+    await put({id:newId(),name,group,...(tm?{timed:true,secs:null}:bw?{bw:true,reps:null}:{}),...(tips?{tips}:{}),photo:st.photo,weight:w,step:1,created:now,updated:now,history:(w>0&&!bw&&!tm)?[{t:now,w}]:[]});closeSheet();load()};
   if(m)$('#fArc').onclick=()=>archiveEx(m);
   if(m)$('#fDel').onclick=async()=>{if(confirm(`למחוק את "${m.name}" כולל כל ההיסטוריה? אי אפשר לבטל.`)){await del(m.id);closeSheet();load()}}}
 
