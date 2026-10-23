@@ -26,7 +26,7 @@ const BW_KEYS=['pull-up','dips','crunch','oblique-crunch'],TIMED_KEYS=['plank'],
 // original built-ins (auto-added on fresh install / "restore"); the rest of LIBRARY is opt-in via "➕ הוסף תרגילים"
 const ORIG_KEYS=['bench-press','incline-press','pec-deck','chest-press-machine','cable-crossover','lat-pulldown','seated-row','barbell-row','pull-up','deadlift','shoulder-press','lateral-raise','reverse-fly','face-pull','barbell-curl','dumbbell-curl','hammer-curl','cable-curl','triceps-pushdown','skull-crusher','dips','squat','leg-press','leg-extension','leg-curl','lunge','calf-raise','hip-thrust','crunch','oblique-crunch','plank','leg-raise'];
 const libType=e=>e.type||(BW_KEYS.includes(e.key)?'bw':TIMED_KEYS.includes(e.key)?'timed':'');
-const libRec=(e,gid,t)=>{const y=libType(e);return {id:newId(),lib:e.key,...(y==='bw'?{bw:true,reps:null}:y==='timed'?{timed:true,secs:null}:{}),name:e.name,group:gid,photo:e.img,weight:0,step:2.5,created:t,updated:t,history:[]}};
+const libRec=(e,gid,t)=>{const y=libType(e);return {id:newId(),lib:e.key,...(y==='bw'?{bw:true,reps:null}:y==='timed'?{timed:true,secs:null}:{}),name:e.name,group:gid,photo:e.img,weight:0,step:1,created:t,updated:t,history:[]}};
 const libRecOf=e=>allM.find(m=>m.lib===e.key||m.name.trim()===e.name);
 const sgn=n=>(n>0?'+':n<0?'−':'')+fmt(Math.abs(n));
 const fromStart=m=>{const f=m.history.find(h=>h.w>0);if(!f||!(m.weight>0))return'';const s0=f.w,d=m.weight-s0;if(!d)return'';const pc=s0?` (${sgn(d/s0*100).replace(/(\.\d)\d+/,'$1')}%)`:'';return `<span style="color:${d>0?'#4ade80':'#f87171'}"><bdi dir="ltr">${sgn(d)}</bdi> ק״ג מההתחלה <bdi dir="ltr">${pc.trim()}</bdi></span>`};
@@ -39,6 +39,7 @@ const fromStartBW=m=>{const f=m.history.find(h=>h.r!=null);if(!f||m.reps==null)r
   if(dw)out.push(`<span style="color:${dw>0?'#4ade80':'#f87171'}"><bdi dir="ltr">${sgn(dw)}</bdi> ק״ג</span>`);return out.length?out.join(' · ')+' מההתחלה':''};
 const bwBig=m=>m.reps==null?'<small>לא הוגדר</small>':`${m.reps} <small>חזרות</small>`;
 const bwSub=m=>m.reps==null?(m.weight>0?`<bdi dir="ltr">+${fmt(m.weight)}</bdi> ק״ג משקל נוסף`:''):(m.weight>0?`<bdi dir="ltr">+${fmt(m.weight)}</bdi> ק״ג משקל נוסף`:'משקל גוף');
+const stepOf=m=>!m.step||m.step===2.5?1:m.step;
 const card=m=>m.timed?`<button class="card" data-id="${m.id}">${m.photo?`<img src="${m.photo}" alt="">`:'<div class="ph">⏱️</div>'}
   <div class="ov"><div class="w">${m.secs==null?'<small>לא הוגדר זמן</small>':`<bdi dir="ltr">${mmss(m.secs)}</bdi>`}</div><div class="d">${m.secs==null?'':`⏱ שיא ${mmss(tBest(m))}`}</div><div class="n">${esc(m.name)}</div><div class="d">${fromStartT(m)}</div><div class="d">${m.history.length?`עודכן: ${fdate(m.updated)}`:'לחץ להפעלת סטופר'}</div></div></button>`:m.bw?`<button class="card" data-id="${m.id}">${m.photo?`<img src="${m.photo}" alt="">`:'<div class="ph">🏋️</div>'}
   <div class="ov"><div class="w">${bwBig(m)}</div><div class="d">${bwSub(m)}</div><div class="n">${esc(m.name)}</div><div class="d">${fromStartBW(m)}</div><div class="d">${m.history.length?`עודכן: ${fdate(m.updated)}`:'לחץ להגדרת חזרות ומשקל'}</div></div></button>`:`<button class="card" data-id="${m.id}">${m.photo?`<img src="${m.photo}" alt="">`:'<div class="ph">🏋️</div>'}
@@ -78,15 +79,15 @@ function openForm(m){const st={photo:m?m.photo:null};
   $('#fSave').onclick=async()=>{const name=$('#fName').value.trim();if(!name){$('#fName').focus();return alert('צריך שם לתרגיל')}
     const group=$('#fG').value,bw=$('#fBW').checked,tm=$('#fTM').checked;if(m){m.name=name;m.photo=st.photo;m.group=group;if(tm!==!!m.timed){await makeTimed(m,tm);await load();openEdit(m.id);return}if(bw&&!m.bw){m.bw=true;if(m.reps===undefined)m.reps=null}else if(!bw&&m.bw)m.bw=false;await put(m);await load();openEdit(m.id);return}
     const w=parseFloat($('#fW').value);if(!(w>=0))return alert('משקל לא תקין');const now=Date.now();
-    await put({id:newId(),name,group,...(tm?{timed:true,secs:null}:bw?{bw:true,reps:null}:{}),photo:st.photo,weight:w,step:2.5,created:now,updated:now,history:(w>0&&!bw&&!tm)?[{t:now,w}]:[]});closeSheet();load()};
+    await put({id:newId(),name,group,...(tm?{timed:true,secs:null}:bw?{bw:true,reps:null}:{}),photo:st.photo,weight:w,step:1,created:now,updated:now,history:(w>0&&!bw&&!tm)?[{t:now,w}]:[]});closeSheet();load()};
   if(m)$('#fArc').onclick=()=>archiveEx(m);
   if(m)$('#fDel').onclick=async()=>{if(confirm(`למחוק את "${m.name}" כולל כל ההיסטוריה? אי אפשר לבטל.`)){await del(m.id);closeSheet();load()}}}
 
-function openEditBW(m){let r=m.reps==null||m.reps<1?8:m.reps,w=m.weight||0,step=m.step||2.5;const hist=[...m.history].reverse();
+function openEditBW(m){let r=m.reps==null||m.reps<1?8:m.reps,w=m.weight||0,step=stepOf(m);const hist=[...m.history].reverse();
   openSheet(`<div class="row between"><h2>${esc(m.name)} <small class="gtag">${esc(gName(m.group))}</small></h2><button class="link" id="eDet">✏️ עריכה</button></div>
   <label>חזרות</label><div class="row"><button class="pm" id="rM">−</button><div class="val" id="rV"></div><button class="pm" id="rP">+</button></div>
   <label>משקל נוסף (ק״ג) · 0 = משקל גוף</label><div class="row"><button class="pm" id="wM">−</button><div class="val" id="wV"></div><button class="pm" id="wP">+</button></div>
-  <div class="steps">${[1,2.5,5].map(s=>`<button data-s="${s}">קפיצה ${s}</button>`).join('')}</div><div class="delta" id="eD"></div>
+  <div class="steps">${[1,2,5].map(s=>`<button data-s="${s}">קפיצה ${s}</button>`).join('')}</div><div class="delta" id="eD"></div>
   <button class="btn pri" id="eSave" disabled>שמור</button><button class="btn" id="eCancel">סגור בלי לשמור</button>
   <h2 style="margin-top:20px">התקדמות</h2><div class="delta">${fromStartBW(m)}</div>${chart(m.history.filter(x=>x.r!=null).map(x=>({t:x.t,w:x.r})))}
   <ul class="hist">${hist.map(x=>`<li><span>${fdate(x.t)}</span><span>${x.r!=null?(x.w>0?`${x.r} חזרות · +${fmt(x.w)} ק״ג`:`${x.r} חזרות · משקל גוף`):`${fmt(x.w)} ק״ג`}</span></li>`).join('')}</ul>`);
@@ -102,12 +103,12 @@ function openEditBW(m){let r=m.reps==null||m.reps<1?8:m.reps,w=m.weight||0,step=
 function chart(h){if(h.length<2)return'';const W=300,H=90,p=10,ws=h.map(x=>x.w),mn=Math.min(...ws),mx=Math.max(...ws),r=mx-mn||1;
   const pts=h.map((x,i)=>[W-p-(i*(W-2*p)/(h.length-1)),H-p-((x.w-mn)/r)*(H-2*p)]);
   return `<svg class="chart" viewBox="0 0 ${W} ${H}"><polyline fill="none" stroke="#22c55e" stroke-width="3" points="${pts.map(q=>q.join(',')).join(' ')}"/>${pts.map(q=>`<circle cx="${q[0]}" cy="${q[1]}" r="4" fill="#22c55e"/>`).join('')}</svg>`}
-function openEdit(id){const m=machines.find(x=>x.id===id);if(!m)return closeSheet();if(m.timed)return openTimed(m);if(m.bw)return openEditBW(m);let v=m.weight,step=m.step||2.5;
+function openEdit(id){const m=machines.find(x=>x.id===id);if(!m)return closeSheet();if(m.timed)return openTimed(m);if(m.bw)return openEditBW(m);let v=m.weight,step=stepOf(m);
   const hist=[...m.history].reverse();
   openSheet(`<div class="row between"><h2>${esc(m.name)} <small class="gtag">${esc(gName(m.group))}</small></h2><button class="link" id="eDet">✏️ עריכה</button></div>
   <div class="big" id="eV"></div><div class="delta" id="eD"></div>
   <div class="row"><button class="pm" id="eMinus">−</button><button class="pm" id="ePlus">+</button></div>
-  <div class="steps">${[1,2.5,5].map(s=>`<button data-s="${s}">קפיצה ${s}</button>`).join('')}</div>
+  <div class="steps">${[1,2,5].map(s=>`<button data-s="${s}">קפיצה ${s}</button>`).join('')}</div>
   <button class="btn pri" id="eSave" disabled>שמור</button><button class="btn" id="eCancel">סגור בלי לשמור</button>
   <h2 style="margin-top:20px">התקדמות</h2><div class="delta">${fromStart(m)}</div>${chart(m.history)}
   <ul class="hist">${hist.map((x,i)=>{const prev=hist[i+1];const d=prev?x.w-prev.w:0;return `<li><span>${fdate(x.t)}</span><span>${fmt(x.w)} ק״ג ${d?`<small style="color:${d>0?'#22c55e':'#f87171'}">(${d>0?'+':''}${fmt(d)})</small>`:''}</span></li>`}).join('')}</ul>`);

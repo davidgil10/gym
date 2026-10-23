@@ -59,7 +59,7 @@ async function syncCard(mid){const m=machines.find(x=>x.id===mid);if(!m||m.timed
   else{let h=mine[0];for(const x of mine)if(better(x,h))h=x;m.weight=h.w;if(m.bw)m.reps=h.r;m.updated=h.t;m.history.push(m.bw?{t:h.t,w:h.w,r:h.r,sid:tag}:{t:h.t,w:h.w,sid:tag})}
   await put(m);await saveActive();if(typeof render==='function')render()}
 function openLog(id){const m=machines.find(x=>x.id===id);if(!m)return;if(m.timed)return openTimed(m);
-  const mine=session.sets.filter(x=>x.mid===id),last=mine[mine.length-1];let w=last?last.w:m.weight,r=last?last.r:(m.bw&&m.reps?m.reps:10);const st=m.step||2.5;
+  const mine=session.sets.filter(x=>x.mid===id),last=mine[mine.length-1];let w=last?last.w:m.weight,r=last?last.r:(m.bw&&m.reps?m.reps:10);const st=stepOf(m);
   const prev=[...sessions].reverse().find(s=>s.sets.some(x=>x.mid===id));
   openSheet(`<div class="row between"><h2>${esc(m.name)}</h2><button class="link" id="lEdit">⚙️ משקל קבוע</button></div>
   <ol class="sets">${mine.map((x,i)=>`<li><span>סט ${i+1}</span><b>${isBW(id)?bwTxt(x.w,x.r):`${fmt(x.w)} ק״ג × ${x.r}`}</b><button class="link" data-ds="${session.sets.indexOf(x)}" style="color:#f87171">✕</button></li>`).join('')||'<li class="muted">עוד לא נרשמו סטים בתרגיל הזה</li>'}</ol>
@@ -82,7 +82,10 @@ const mmss=s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
 function startRest(sec){sec=sec||restDur();localStorage.setItem('restEnd',Date.now()+sec*1000);restDone=false;renderRest()}
 function stopRest(){localStorage.removeItem('restEnd');clearInterval(restTick);$('#restBar').hidden=true;document.body.classList.remove('flash')}
 function adjRest(d){const e=+localStorage.getItem('restEnd');if(!e)return;localStorage.setItem('restEnd',Math.max(Date.now(),e+d*1000));restDone=false;renderRest()}
-function beep(){try{const A=window.AudioContext||window.webkitAudioContext;const c=new A();[0,.35,.7].forEach(t=>{const o=c.createOscillator(),g=c.createGain();o.frequency.value=880;o.connect(g);g.connect(c.destination);g.gain.setValueAtTime(.4,c.currentTime+t);g.gain.exponentialRampToValueAtTime(.001,c.currentTime+t+.3);o.start(c.currentTime+t);o.stop(c.currentTime+t+.3)})}catch(e){}}
+let actx=null;
+function audioUnlock(){try{const A=window.AudioContext||window.webkitAudioContext;if(!A)return;if(!actx)actx=new A();if(actx.state==='suspended')actx.resume();const b=actx.createBuffer(1,1,22050),src=actx.createBufferSource();src.buffer=b;src.connect(actx.destination);src.start(0)}catch(e){}}
+['pointerdown','touchend','click','keydown'].forEach(ev=>document.addEventListener(ev,audioUnlock,{capture:true,passive:true}));
+function beep(){try{if(!actx)audioUnlock();const c=actx;if(!c)return;if(c.state==='suspended')c.resume();const t0=c.currentTime+.02;[[0,880],[.18,1175],[.36,1568],[.9,880],[1.08,1175],[1.26,1568]].forEach(([t,f])=>{const o=c.createOscillator(),g=c.createGain();o.type='sine';o.frequency.value=f;o.connect(g);g.connect(c.destination);g.gain.setValueAtTime(.0001,t0+t);g.gain.exponentialRampToValueAtTime(.5,t0+t+.02);g.gain.exponentialRampToValueAtTime(.001,t0+t+.45);o.start(t0+t);o.stop(t0+t+.5)});window.__beeps=(window.__beeps||0)+1}catch(e){}}
 function renderRest(){const e=+localStorage.getItem('restEnd');const bar=$('#restBar');clearInterval(restTick);if(!e||!session){bar.hidden=true;return}bar.hidden=false;
   const tick=()=>{const left=Math.ceil((e-Date.now())/1000);
     if(left<=0){$('#restT').textContent='0:00';$('#restL').textContent='⏰ זמן לסט הבא!';if(!restDone){restDone=true;window.__restAlerts=(window.__restAlerts||0)+1;navigator.vibrate&&navigator.vibrate([300,150,300,150,300]);beep();document.body.classList.add('flash');setTimeout(()=>document.body.classList.remove('flash'),3000)}}
