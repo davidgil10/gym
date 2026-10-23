@@ -21,7 +21,10 @@ async function load(){allM=(await all()).sort((a,b)=>a.created-b.created);machin
   const tDone=(await metaGet('timedMigrated'))||[],tTodo=TIMED_KEYS.filter(k=>!tDone.includes(k));
   if(tTodo.length){for(const m of machines)if(tTodo.includes(m.lib)&&!m.timed)await makeTimed(m,true);await metaPut('timedMigrated',[...tDone,...tTodo])}
   for(const m of machines){if(m.bw||m.timed)continue;const h=(m.history||[]).filter(x=>x.w>0);let ch=h.length!==(m.history||[]).length;if(!h.length&&m.weight>0){h.push({t:m.updated||Date.now(),w:m.weight});ch=true}if(ch){m.history=h;await put(m)}}
-  for(const m of machines){const L=m.lib&&typeof LIBRARY!=='undefined'&&LIBRARY.find(e=>e.key===m.lib);if(L&&typeof m.photo==='string'&&m.photo.startsWith('img/')&&m.photo!==L.img){m.photo=L.img;await put(m)}}machines=allM.filter(m=>!m.archived);render()}
+  if(typeof LIBRARY!=='undefined'){const nn=s=>String(s||'').trim().replace(/\s+/g,' '),byK={},byN={};for(const e of LIBRARY){byK[e.key]=e;byN[nn(e.name)]=e}const held=new Set(allM.map(m=>m.lib).filter(Boolean));
+    for(const m of allM){let ch=false,L=m.lib&&byK[m.lib];if(!L&&!m.lib){L=byN[nn(m.name)];if(L&&!held.has(L.key)){m.lib=L.key;held.add(L.key);ch=true}else L=null}
+      if(L){const ph=m.photo;const builtin=!ph||(typeof ph==='string'&&!ph.startsWith('data:')&&!ph.startsWith('blob:')&&/(^|\/)img\/[a-z0-9-]+\.(webp|svg|jpe?g|png)(\?[^/]*)?$/.test(ph));if(builtin&&ph!==L.img){m.photo=L.img;ch=true}}
+      if(ch)await put(m)}}machines=allM.filter(m=>!m.archived);render()}
 const BW_KEYS=['pull-up','dips','crunch','oblique-crunch'],TIMED_KEYS=['plank'],NEW_LIB_KEYS=['oblique-crunch'];
 // original built-ins (auto-added on fresh install / "restore"); the rest of LIBRARY is opt-in via "➕ הוסף תרגילים"
 const ORIG_KEYS=['bench-press','incline-press','pec-deck','chest-press-machine','cable-crossover','lat-pulldown','seated-row','barbell-row','pull-up','deadlift','shoulder-press','lateral-raise','reverse-fly','face-pull','barbell-curl','dumbbell-curl','hammer-curl','cable-curl','triceps-pushdown','skull-crusher','dips','squat','leg-press','leg-extension','leg-curl','lunge','calf-raise','hip-thrust','crunch','oblique-crunch','plank','leg-raise'];
