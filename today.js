@@ -5,9 +5,12 @@ const dayStart=t=>{const d=new Date(t);d.setHours(0,0,0,0);return d.getTime()};
 const daysAgo=t=>Math.round((dayStart(Date.now())-dayStart(t))/864e5);
 const agoTxt=d=>d==null?'עוד לא אומן':d===0?'היום':d===1?'אתמול':`לפני ${d} ימים`;
 const agoCls=d=>d==null||d>10?'red':d>=5?'orange':'green';
-function lastDoneMap(){const L={};const all=[...sessions,...(session?[session]:[])];
-  for(const s of all)for(const x of s.sets||[]){const t=x.t||s.start;if(!(L[x.mid]>=t))L[x.mid]=t}return L}
-function areaStats(){const L=lastDoneMap();
+function lastDoneMap(before){const L={};const all=[...sessions,...(session?[session]:[])];
+  for(const s of all)for(const x of s.sets||[]){const t=x.t||s.start;if(before&&t>=before)continue;if(!(L[x.mid]>=t))L[x.mid]=t}return L}
+// sets done today per area (finished + active sessions)
+function setsTodayIn(gid){const t0=dayStart(Date.now());let n=0;for(const s of [...sessions,...(session?[session]:[])])for(const x of s.sets||[]){if((x.t||s.start)<t0)continue;const m=allM.find(y=>y.id===x.mid);if(m&&m.group===gid)n++}return n}
+// ranking ignores today's sets so a partly trained area keeps its place (fix: area vanished after 1 exercise)
+function areaStats(){const L=lastDoneMap(dayStart(Date.now()));
   return groups.map((g,i)=>{const ms=machines.filter(m=>m.group===g.id);if(!ms.length)return null;
     const ts=allM.filter(m=>m.group===g.id).map(m=>L[m.id]).filter(Boolean);const last=ts.length?Math.max(...ts):null;
     return {g,i,ms,last,days:last==null?null:daysAgo(last)}}).filter(Boolean)
@@ -17,7 +20,9 @@ function pickExercises(a,n=3){const L=lastDoneMap();const done=a.ms.filter(m=>L[
 // deferrals ("דחה למחר") – kept until the date changes
 function deferred(){try{const d=JSON.parse(localStorage.todayDefer||'null');return d&&d.d===today()?d.g:[]}catch{return[]}}
 function setDeferred(g){localStorage.todayDefer=JSON.stringify({d:today(),g})}
-function todayAreas(){const A=areaStats(),D=deferred();return {list:A.filter(a=>!D.includes(a.g.id)).slice(0,3),def:A.filter(a=>D.includes(a.g.id)),all:A}}
+// stable order for the day (ranked on pre-today history); an area leaves only when fully done today (SET_GOAL sets) or deferred
+function todayAreas(){const A=areaStats(),D=deferred();
+  return {list:A.filter(a=>!D.includes(a.g.id)&&setsTodayIn(a.g.id)<SET_GOAL).slice(0,3),def:A.filter(a=>D.includes(a.g.id)),all:A}}
 function renderToday(){const el=$('#today');if(!el)return;
   if(view!=='machines'||session){el.hidden=true;return}el.hidden=false;
   const {list,def,all}=todayAreas();
