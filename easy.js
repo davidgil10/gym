@@ -9,6 +9,10 @@ function easyHint(id){const m=allM.find(x=>x.id===id);if(!m||m.timed)return;cons
   const st=stepOf(m),w=m.weight||0;const sug=m.bw?'':` <small>הצעה: <bdi dir="ltr">${fmt(w+1)}</bdi> ק״ג (+1) או <bdi dir="ltr">${fmt(w+2)}</bdi> ק״ג (+2)</small>`;
   const h=sh.querySelector('h2');const html=`<div class="easyhint">💡 דירגת קל בפעם הקודמת — מומלץ להוסיף משקל${sug}</div>`;
   const row=h&&h.closest('.row');(row||h)?(row||h).insertAdjacentHTML('afterend',html):sh.insertAdjacentHTML('afterbegin',html)}
+// "last time" difficulty pill under the title of every exercise sheet (log / edit / timed / demo)
+function leSheet(id){const sh=$('#sheet');if(!sh||sh.hidden||sh.querySelector('.lastease'))return;const h=sh.querySelector('h2');if(!h)return;const row=h.closest('.row');(row||h).insertAdjacentHTML('afterend',lastEaseHTML(id,'sheet'))}
+for(const fn of ['openLog','openEdit','openEditBW','openTimed']){const o=window[fn];window[fn]=function(a){const r=o.apply(this,arguments);const id=a&&typeof a==='object'?a.id:a;if(id)leSheet(id);return r}}
+{const _od=openDemo;openDemo=function(m){const r=_od.apply(this,arguments);leSheet(m.id);return r}}
 {const _ol=openLog;openLog=function(id){const r=_ol.apply(this,arguments);easyHint(id);return r}}
 {const _oe=openEdit;openEdit=function(id){const r=_oe.apply(this,arguments);easyHint(id);return r}}
 {const _sh=sessionHTML;sessionHTML=function(s){return _sh(s)+easyHTML([s])}}

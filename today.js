@@ -32,7 +32,7 @@ function renderToday(){const el=$('#today');if(!el)return;
   el.innerHTML=`<div class="tdh"><button class="tdt" id="tdTog" aria-expanded="${open}"><b>🎯 מה לאמן היום:</b> <span>${list.length?list.map(a=>esc(a.g.name)).join(' · '):'הכול נדחה למחר'}</span>${list[0]?` <small class="tdb ${agoCls(list[0].days)}">${agoTxt(list[0].days)}</small>`:''} <span class="tdc">${open?'▴':'▾'}</span></button></div>
   ${open?`${!sessions.length?'<p class="tdm">עוד אין אימונים רשומים – הנה הצעה להתחלה 🙂</p>':''}
   ${list.map((a,i)=>`<div class="tdr ${agoCls(a.days)}" data-ta="${a.g.id}"><div class="tdrh"><span class="tdn">${i+1}. ${esc(a.g.name)}</span><small class="tdb ${agoCls(a.days)}">${agoTxt(a.days)}</small><button class="tdHere" data-here="${a.g.id}">▶ התחל</button><button class="tdDef" data-def="${a.g.id}">דחה למחר ⏭</button></div>
-    <div class="tdx">${pickExercises(a).map(m=>`<span class="tde" data-ago="${L[m.id]?agoTxt(daysAgo(L[m.id])):'חדש'}">${esc(m.name)}</span>`).join('')}</div></div>`).join('')}
+    <div class="tdx">${pickExercises(a).map(m=>`<span class="tde" data-ago="${L[m.id]?agoTxt(daysAgo(L[m.id])):'חדש'}"${(()=>{const e=lastEase(m.id);return e.r?` data-ease="${RATE_EM[e.r]}" title="קושי קודם: ${RATE_SH[e.r]}"`:''})()}>${esc(m.name)}</span>`).join('')}</div></div>`).join('')}
   ${!list.length?'<p class="tdm">כל האזורים נדחו למחר 😴</p>':''}
   ${def.length?`<p class="tdm small">נדחו למחר: ${def.map(a=>esc(a.g.name)).join(', ')} · <button class="link" id="tdUndef">בטל דחייה</button></p>`:''}
   ${list.length?`<button class="btn pri" id="tdGo">▶️ התחל אימון · ${list.length===1?esc(list[0].g.name):list.length+' אזורים'}</button>`:''}

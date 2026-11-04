@@ -35,6 +35,18 @@ async function endSession(endAt,ask=true){if(!session)return;
   const s=session;s.end=typeof endAt==='number'?endAt:Date.now();sessions.push(s);session=null;await saveSessions();await saveActive();stopRest();renderSessBar();showSessionReport(s.id);if(typeof checkMotivation=='function')checkMotivation('report')}
 // --- difficulty rating (asked once per exercise, when closing it) ---
 const RATE_TXT=['','קל מאוד','קל','בינוני','קשה','קשה מאוד'];
+// --- "last time" difficulty: latest finished session (before `before`) that rated this exercise ---
+const RATE_EM=['','😌','🙂','😐','😓','🥵'],RATE_SH=['','קל מאוד','קל','בינוני','קשה','קשה מאוד'];
+const dmShort=t=>{const d=new Date(t);return d.getDate()+'.'+(d.getMonth()+1)};
+function lastEase(id,before){let b=null,any=false;for(const s of sessions){if(before!=null&&s.start>=before)continue;if(s.sets&&s.sets.some(x=>x.mid===id))any=true;const r=(s.rates||{})[id];if(r>0&&(!b||s.start>b.start))b=s}
+  if(!b)return{any};const r=b.rates[id];let top=null;for(const x of b.sets.filter(x=>x.mid===id)){if(!top||(x.s||0)>(top.s||0)||x.w>top.w||(x.w===top.w&&x.r>top.r))top=x}
+  return{any,r,t:b.start,top}}
+function leDetail(id,top){if(!top)return'';if(isTimed(id))return top.s?`⏱ ${mmss(top.s)}`:'';const w=top.w>0?`${fmt(top.w)} ק״ג${isBW(id)?' נוסף':''} × ${top.r}`:`${top.r} חזרות`;return w}
+function lastEaseHTML(id,mode,before){const e=lastEase(id,before),cls=e.r?(e.r<=2?'lo':e.r===3?'mid':'hi'):'none';
+  if(mode==='card')return e.r?`<div class="d le ${cls}" title="קושי בפעם הקודמת">קודם: ${RATE_SH[e.r]} ${RATE_EM[e.r]} · <bdi dir="ltr">${dmShort(e.t)}</bdi></div>`:'';
+  if(mode==='tiny')return e.r?`<small class="le ${cls}">${RATE_EM[e.r]} ${RATE_SH[e.r]}</small>`:'';
+  if(!e.r)return `<div class="lastease none" data-le="none">פעם קודמת: ${e.any?'לא דורג':'אין עדיין היסטוריה'}</div>`;
+  const dt=leDetail(id,e.top);return `<div class="lastease ${cls}" data-le="${e.r}"><span>פעם קודמת:</span> <b>${RATE_SH[e.r]} ${RATE_EM[e.r]}</b>${dt?` · ${dt}`:''} · ${dmShort(e.t)}</div>`}
 function finishExercise(id){if(!session||!session.sets.some(x=>x.mid===id)||(session.rates||{})[id]||(session.rateSkip||[]).includes(id))return closeSheet();openRate(id)}
 function openRate(id,again){const m=machines.find(x=>x.id===id);if(!m||!session)return closeSheet();const cur=(session.rates||{})[id]||0;
   openSheet(`<h2>איך היה ${esc(m.name)}?</h2><p class="muted small">דרג את הקושי של התרגיל (פעם אחת לתרגיל)</p><div class="rates">${[1,2,3,4,5].map(n=>`<button class="rateb r${n}${cur===n?' on':''}" data-rate="${n}"><b>${n}</b><small>${RATE_TXT[n]}</small></button>`).join('')}</div><button class="btn" id="rtSkip">${again?'סגור':'דלג'}</button>`);
@@ -100,13 +112,13 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)renderRest
 function agg(list){const ex={},grp={};let v=0,t=0,n=0;
   for(const s of list){t+=(s.end||Date.now())-s.start;
     for(const x of s.sets){n++;const vv=x.w*x.r;v+=vv;const g=mGroup(x);grp[g]=(grp[g]||0)+vv;
-      const e=ex[x.mid]||(ex[x.mid]={name:mName(x),group:g,vol:0,sets:0,reps:0,firstMax:null,lastMax:null,max:0,_s:null});
+      const e=ex[x.mid]||(ex[x.mid]={id:x.mid,name:mName(x),group:g,vol:0,sets:0,reps:0,firstMax:null,lastMax:null,max:0,_s:null});
       e.vol+=vv;e.sets++;e.reps+=x.r;e.max=Math.max(e.max,x.w);
       if(e._s!==s.id){e._s=s.id;if(e.firstMax==null)e.firstMax=x.w;e.lastMax=x.w}else{e.lastMax=Math.max(e.lastMax,x.w);if(e.firstSid===undefined)0}
     }
     for(const k in ex)if(ex[k]._s===s.id&&ex[k]._first===undefined)ex[k]._first=s.id;
   }
-  for(const k in ex){const v=list.map(s=>(s.rates||{})[k]).filter(x=>x>0);if(v.length)ex[k].rate=Math.round(v.reduce((a,b)=>a+b,0)/v.length*10)/10}
+  for(const k in ex){const v=list.map(s=>(s.rates||{})[k]).filter(x=>x>0);if(v.length){ex[k].rate=Math.round(v.reduce((a,b)=>a+b,0)/v.length*10)/10;ex[k].rateLast=v[v.length-1]}}
   // firstMax = max of first session containing exercise
   for(const k in ex){const ss=list.filter(s=>s.sets.some(x=>x.mid===k));const ssP=ss.filter(s=>s.sets.some(x=>x.mid===k&&x.w>0));const mx=s=>Math.max(...s.sets.filter(x=>x.mid===k).map(x=>x.w));ex[k].firstMax=ssP.length?mx(ssP[0]):0;ex[k].lastMax=ssP.length?mx(ssP[ssP.length-1]):0;
     if(isTimed(k)&&ss.length){const bs=s=>Math.max(...s.sets.filter(x=>x.mid===k).map(x=>x.s||0));ex[k].timed=true;ex[k].fb=bs(ss[0]);ex[k].lb=bs(ss[ss.length-1]);ex[k].secs=list.reduce((a,s)=>a+s.sets.filter(x=>x.mid===k).reduce((b,x)=>b+(x.s||0),0),0)}
@@ -127,7 +139,7 @@ function sessionHTML(s){const a=agg([s]),pr=prsOf(s),rs=restStats(s),cp=completi
   return `<div class="stats3"><div class="stat"><div class="st">משך</div><div class="sv2">${durTxt(s.end-s.start)}</div></div><div class="stat"><div class="st">סטים</div><div class="sv2">${a.sets}</div></div>${a.vol?`<div class="stat"><div class="st">נפח (ק״ג)</div><div class="sv2">${nf(a.vol)}</div></div>`:''}${rs?`<div class="stat"><div class="st">מנוחה ממוצעת</div><div class="sv2">${mmss(rs.avg)}</div></div>`:''}</div>
   ${cp.length?`<h3 class="sec">🎯 השלמה לפי אזור <small class="muted">(יעד 9 סטים)</small></h3><div class="cpl">${cp.map(c=>`<div class="cp"><span>${esc(c.g)}</span><div class="cpb"><i style="width:${c.p}%" class="${c.p>=100?'full':c.p>=50?'mid':'low'}"></i></div><b>${c.p}%</b><small>${c.n}/9</small></div>`).join('')}</div>`:''}
   ${pr.length?`<div class="pr">🏆 שיאים אישיים: ${pr.map(p=>`<div><b>${esc(p.name)}</b> ${p.txt||fmt(p.w)+' ק״ג'} <small>(קודם ${p.ptxt||fmt(p.prev)})</small></div>`).join('')}</div>`:''}
-  ${Object.keys(byG).map(g=>{const byM={};for(const x of byG[g])(byM[x.mid]=byM[x.mid]||[]).push(x);return `<h3 class="sec">${esc(g)} ${vol(byG[g])?`<small class="muted">${nf(vol(byG[g]))} ק״ג</small>`:''}</h3>`+Object.values(byM).map(xs=>`<div class="exr"><b>${esc(mName(xs[0]))}${rt[xs[0].mid]?` <span class="rtag r${rt[xs[0].mid]}">קושי ${rt[xs[0].mid]}/5</span>`:''}</b><div>${xs.map(x=>{const v=RM.get(x);return `<span class="pill">${setTxt(x)}${v!=null&&v<=REST_MAX?`<small class="rst">⏸ ${mmss(v)}</small>`:''}</span>`}).join('')}</div><small class="muted">${isTimed(xs[0].mid)?`סה״כ ${mmss(xs.reduce((a,x)=>a+(x.s||0),0))}`:isBW(xs[0].mid)?`סה״כ ${xs.reduce((a,x)=>a+x.r,0)} חזרות`:vol(xs)?`נפח ${nf(vol(xs))} ק״ג`:`${xs.length} סטים`}</small></div>`).join('')}).join('')}`}
+  ${Object.keys(byG).map(g=>{const byM={};for(const x of byG[g])(byM[x.mid]=byM[x.mid]||[]).push(x);return `<h3 class="sec">${esc(g)} ${vol(byG[g])?`<small class="muted">${nf(vol(byG[g]))} ק״ג</small>`:''}</h3>`+Object.values(byM).map(xs=>`<div class="exr"><b>${esc(mName(xs[0]))}${rt[xs[0].mid]?` <span class="rtag r${rt[xs[0].mid]}">קושי ${rt[xs[0].mid]}/5</span>`:''}</b>${lastEaseHTML(xs[0].mid,'sess',s.start).replace('פעם קודמת:','קודם:')}<div>${xs.map(x=>{const v=RM.get(x);return `<span class="pill">${setTxt(x)}${v!=null&&v<=REST_MAX?`<small class="rst">⏸ ${mmss(v)}</small>`:''}</span>`}).join('')}</div><small class="muted">${isTimed(xs[0].mid)?`סה״כ ${mmss(xs.reduce((a,x)=>a+(x.s||0),0))}`:isBW(xs[0].mid)?`סה״כ ${xs.reduce((a,x)=>a+x.r,0)} חזרות`:vol(xs)?`נפח ${nf(vol(xs))} ק״ג`:`${xs.length} סטים`}</small></div>`).join('')}).join('')}`}
 const dtl=t=>{const d=new Date(t);d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,16)};
 function editTimes(s){openSheet(`<h2>🕒 עריכת זמני האימון</h2><label>התחלה</label><input type="datetime-local" id="tsA" value="${dtl(s.start)}"><label>סיום</label><input type="datetime-local" id="tsB" value="${dtl(s.end)}">
   <div class="delta" id="tsD"></div><button class="btn pri" id="tsOk">שמור</button><button class="btn" id="tsX">ביטול</button>`);
@@ -166,7 +178,7 @@ function periodText(){const{p,A,B}=periodData();const nm=rp.type==='week'?'שב�
   const bw=bodyChg(p,'w'),bf=bodyChg(p,'f');if(bw||bf)t+=`\n⚖️ ${bw?`משקל ${fmt(bw.a)}→${fmt(bw.b)} ק״ג`:''}${bw&&bf?' · ':''}${bf?`שומן ${fmt(bf.a)}→${fmt(bf.b)}%`:''}\n`;return t}
 function exLi(e){const d=e.lastMax-e.firstMax;
   const right=e.timed?`⏱ ${mmss(e.fb)} → ${mmss(e.lb)}`:e.bw?`${bwTxt(e.fb.w,e.fb.r)} → ${bwTxt(e.lb.w,e.lb.r)}`:`<bdi dir="ltr">${fmt(e.firstMax)}→${fmt(e.lastMax)}</bdi> ק״ג ${d?`<small class="${d>0?'up2':'down2'}">(${d>0?'+':'−'}${fmt(Math.abs(d))})</small>`:''}`;
-  return `<li><span>${esc(e.name)}<br><small class="muted">${e.sets} סטים${e.timed?` · סה״כ ${mmss(e.secs)}`:e.bw?` · ${e.reps} חזרות`:e.vol?` · נפח ${nf(e.vol)}`:''}${e.rate?` · קושי ממוצע ${e.rate}/5`:''}</small></span><span>${right}</span></li>`}
+  return `<li><span>${esc(e.name)}<br><small class="muted">${e.sets} סטים${e.timed?` · סה״כ ${mmss(e.secs)}`:e.bw?` · ${e.reps} חזרות`:e.vol?` · נפח ${nf(e.vol)}`:''}${e.rate?` · קושי ממוצע ${e.rate}/5`:''}${e.rateLast?` · אחרון ${RATE_EM[e.rateLast]} ${RATE_SH[e.rateLast]}`:''}</small></span><span>${right}</span></li>`}
 function renderReports(){const{p,A,B,list}=periodData();const el=$('#repView');
   const grps=[...new Set([...Object.keys(A.grp),...Object.keys(B.grp)])].filter(g=>(A.grp[g]||0)||(B.grp[g]||0));
   const bw=bodyChg(p,'w'),bf=bodyChg(p,'f');
